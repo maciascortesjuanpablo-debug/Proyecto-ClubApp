@@ -2,6 +2,7 @@ import express from 'express';
 import dotenv from 'dotenv';
 import { conectaDB,supabase } from './config/supabase.js';
 import CatalogoRoutes from './routes/catalogo.js';
+import usuarioRoutes from './routes/usuario.routes.js';
 
 // Cargar variables de entorno
 dotenv.config();
@@ -13,8 +14,12 @@ const app = express();
 //Leer el json 
 app.use(express.json());
 
+//Rutas de usuario
+app.use('/usuarios', usuarioRoutes);
+
 //rutas de catalogo
 app.use('/catalogo', CatalogoRoutes);
+
 
 
 //Configuramos el puerto
