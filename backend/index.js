@@ -1,35 +1,32 @@
 import express from 'express';
-import dotenv from 'dotenv';
 import cors from 'cors';
-import { conectaDB, supabase } from './config/supabase.js';
+import dotenv from 'dotenv';
+import { conectaDB } from './config/supabase.js';
+
+import authRoutes from './routes/auth.js';
 import usuarioRoutes from './routes/usuario.js';
+import verificarCodigoRoutes from './routes/verificar_codigo.js';
 import catalogoRoutes from './routes/catalogo.js';
 import perfilJugadorRoutes from './routes/perfil_jugador.js';
+import torneosRoutes from './routes/torneos.js';
+import equiposRoutes from './routes/equipos.js';
 import inscripcionesRoutes from './routes/inscripciones.js';
 
-// Cargar variables de entorno
 dotenv.config();
 conectaDB();
 
-
-//Creamos la aplicacio de express
 const app = express();
-
 app.use(cors());
-//Leer el json 
 app.use(express.json());
 
-//Rutas de usuario
-app.use('/usuarios', usuarioRoutes);
-
-//rutas de catalogo
-app.use('/catalogo', catalogoRoutes);
-
-//rutas de perfil de jugador
-app.use('/perfil-jugador', perfilJugadorRoutes);
-
-//rutas de inscripciones
-app.use('/inscripciones', inscripcionesRoutes);
+app.use('/api/auth', authRoutes);
+app.use('/api/usuarios', usuarioRoutes);
+app.use('/api/recuperar-password', verificarCodigoRoutes);
+app.use('/api/catalogo', catalogoRoutes);
+app.use('/api/perfil-jugador', perfilJugadorRoutes);
+app.use('/api/torneos', torneosRoutes);
+app.use('/api/equipos', equiposRoutes);
+app.use('/api/inscripciones', inscripcionesRoutes);
 
 
 //Configuramos el puerto

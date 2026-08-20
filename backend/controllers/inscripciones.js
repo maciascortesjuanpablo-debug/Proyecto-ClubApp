@@ -1,5 +1,5 @@
 import { inscripcionModel } from '../models/inscripciones.js';
-
+import { equipoModel } from '../models/equipos.js';
 
 // ---- INSCRIPCIONES ----
 

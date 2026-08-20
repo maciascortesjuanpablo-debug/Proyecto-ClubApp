@@ -3,7 +3,7 @@ import {
   crearTorneo, obtenerTorneos, obtenerTorneoPorId, obtenerTorneosPorOrganizador,
   actualizarTorneo, eliminarTorneo, crearGrupo, obtenerGruposPorTorneo
 } from '../controllers/torneos.js';
-import { verificarToken } from '../middleware/verificarToken.js';
+import { verificarToken } from '../middlewares/middlewares.js';
 
 const router = Router();
 
