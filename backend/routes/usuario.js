@@ -4,8 +4,9 @@ import {
   obtenerUsuarioPorId,
   actualizarUsuario,
   eliminarUsuario
-} from '../controllers/usuario.controller.js';
-import { verificarToken } from '../middleware/verificarToken.js';
+} from '../controllers/usuario.js';
+import { verificarToken } from '../middlewares/middlewares.js';
+
 
 const router = Router();
 

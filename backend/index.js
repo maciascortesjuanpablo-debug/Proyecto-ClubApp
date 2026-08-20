@@ -1,16 +1,21 @@
 import express from 'express';
 import dotenv from 'dotenv';
-import { conectaDB,supabase } from './config/supabase.js';
-import CatalogoRoutes from './routes/catalogo.js';
-import usuarioRoutes from './routes/usuario.routes.js';
+import cors from 'cors';
+import { conectaDB, supabase } from './config/supabase.js';
+import usuarioRoutes from './routes/usuario.js';
+import catalogoRoutes from './routes/catalogo.js';
+import perfilJugadorRoutes from './routes/perfil_jugador.js';
+import inscripcionesRoutes from './routes/inscripciones.js';
 
 // Cargar variables de entorno
 dotenv.config();
 conectaDB();
 
+
 //Creamos la aplicacio de express
 const app = express();
 
+app.use(cors());
 //Leer el json 
 app.use(express.json());
 
@@ -18,8 +23,13 @@ app.use(express.json());
 app.use('/usuarios', usuarioRoutes);
 
 //rutas de catalogo
-app.use('/catalogo', CatalogoRoutes);
+app.use('/catalogo', catalogoRoutes);
 
+//rutas de perfil de jugador
+app.use('/perfil-jugador', perfilJugadorRoutes);
+
+//rutas de inscripciones
+app.use('/inscripciones', inscripcionesRoutes);
 
 
 //Configuramos el puerto
