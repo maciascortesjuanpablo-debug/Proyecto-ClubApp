@@ -4,23 +4,23 @@ import {
   agregarJugadorEquipo, obtenerPlantilla, actualizarJugadorEquipo, eliminarJugadorEquipo,
   agregarStaffEquipo, obtenerStaffEquipo, eliminarStaffEquipo
 } from '../controllers/equipos.js';
-import { verificarToken } from '../middlewares/middlewares.js';
+import { verificarToken, verificarRol } from '../middlewares/auth.js';
 
 const router = Router();
 
-router.post('/', verificarToken, crearEquipo);
+router.post('/', verificarToken, verificarRol(3, 4, 6), crearEquipo);     // Entrenador, Organizador, Admin
 router.get('/', obtenerEquipos);
 router.get('/:id', obtenerEquipoPorId);
-router.put('/:id', verificarToken, actualizarEquipo);
-router.delete('/:id', verificarToken, eliminarEquipo);
+router.put('/:id', verificarToken, verificarRol(3, 4, 6), actualizarEquipo);
+router.delete('/:id', verificarToken, verificarRol(3, 6), eliminarEquipo); // Entrenador (dueño), Admin
 
-router.post('/:id/jugadores', verificarToken, agregarJugadorEquipo);
+router.post('/:id/jugadores', verificarToken, verificarRol(3, 4, 6), agregarJugadorEquipo);
 router.get('/:id/jugadores', obtenerPlantilla);
-router.put('/:id/jugadores/:usuarioId', verificarToken, actualizarJugadorEquipo);
-router.delete('/:id/jugadores/:usuarioId', verificarToken, eliminarJugadorEquipo);
+router.put('/:id/jugadores/:usuarioId', verificarToken, verificarRol(3, 4, 6), actualizarJugadorEquipo);
+router.delete('/:id/jugadores/:usuarioId', verificarToken, verificarRol(3, 4, 6), eliminarJugadorEquipo);
 
-router.post('/:id/staff', verificarToken, agregarStaffEquipo);
+router.post('/:id/staff', verificarToken, verificarRol(3, 4, 6), agregarStaffEquipo);
 router.get('/:id/staff', obtenerStaffEquipo);
-router.delete('/:id/staff/:usuarioId', verificarToken, eliminarStaffEquipo);
+router.delete('/:id/staff/:usuarioId', verificarToken, verificarRol(3, 4, 6), eliminarStaffEquipo);
 
 export default router;
