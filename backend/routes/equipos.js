@@ -4,7 +4,7 @@ import {
   agregarJugadorEquipo, obtenerPlantilla, actualizarJugadorEquipo, eliminarJugadorEquipo,
   agregarStaffEquipo, obtenerStaffEquipo, eliminarStaffEquipo
 } from '../controllers/equipos.js';
-import { verificarToken, verificarRol } from '../middlewares/auth.js';
+import { verificarToken, verificarRol } from '../middlewares/middlewares.js';
 
 const router = Router();
 

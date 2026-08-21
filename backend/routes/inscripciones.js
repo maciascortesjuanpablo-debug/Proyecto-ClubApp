@@ -4,7 +4,7 @@ import {
   obtenerTablaPosiciones,
   crearInvitacion, obtenerInvitacionesPorUsuario, responderInvitacion
 } from '../controllers/inscripciones.js';
-import { verificarToken, verificarRol } from '../middlewares/auth.js';
+import { verificarToken, verificarRol } from '../middlewares/middlewares.js';
 
 const router = Router();
 

@@ -3,7 +3,7 @@ import {
   crearSede, obtenerSedes, crearEvento, obtenerEventosPorTorneo, obtenerEventoPorId,
   actualizarEvento, eliminarEvento, asignarArbitro, obtenerArbitrosPorEvento
 } from '../controllers/calendario.js';
-import { verificarToken, verificarRol } from '../middlewares/auth.js';
+import { verificarToken, verificarRol } from '../middlewares/middlewares.js';
 
 const router = Router();
 
