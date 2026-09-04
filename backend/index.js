@@ -16,6 +16,7 @@ import calendarioRoutes from './routes/calendario.js';
 import estadisticasRoutes from './routes/estadisticas.js';
 import notificacionesRoutes from './routes/notificaciones.js';
 import favoritosRoutes from './routes/favoritos.js';
+import scoutAiRoutes from "./routes/scouthIA.js";
 
 dotenv.config();
 conectaDB();
@@ -48,6 +49,8 @@ app.use('/api/estadisticas', estadisticasRoutes);
 app.use('/api/notificaciones', notificacionesRoutes);
 //Ruta favoritos
 app.use('/api/favoritos', favoritosRoutes);
+//Ruta Scout AI
+app.use("/api/scout", scoutAiRoutes);
 
 
 //Configuramos el puerto
