@@ -1,12 +1,17 @@
 import { Router } from 'express';
-import { crearPerfil, obtenerPerfilPorUsuario, actualizarPerfil } from '../controllers/perfil_jugador.js';
-import { verificarToken } from '../middlewares/middlewares.js';
-
+import {
+  crearPerfil,
+  obtenerPerfilPorUsuario,
+  actualizarPerfil,
+  actualizarFotoPerfil,
+} from '../controllers/perfil_jugador.js';
+import { uploadFotoPerfil } from '../middlewares/upload.js';
 
 const router = Router();
 
-router.post('/', verificarToken, crearPerfil);
-router.get('/:usuarioId', verificarToken, obtenerPerfilPorUsuario);
-router.put('/:usuarioId', verificarToken, actualizarPerfil);
+router.post('/', crearPerfil);
+router.get('/:usuarioId', obtenerPerfilPorUsuario);
+router.put('/:usuarioId', actualizarPerfil);
+router.put('/:usuarioId/foto', uploadFotoPerfil.single('foto'), actualizarFotoPerfil);
 
 export default router;
