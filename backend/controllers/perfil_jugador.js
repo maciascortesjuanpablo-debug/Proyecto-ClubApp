@@ -1,4 +1,5 @@
 import { perfilJugadorModel } from '../models/perfil_jugador.js';
+import { eliminarImagen } from '../utils/cloudinaryutils.js';
 
 export const crearPerfil = async (req, res) => {
   try {
@@ -49,5 +50,33 @@ export const actualizarPerfil = async (req, res) => {
   } catch (error) {
     console.error(error);
     res.status(500).json({ mensaje: 'Error al actualizar el perfil', error: error.message });
+  }
+};
+
+export const actualizarFotoPerfil = async (req, res) => {
+  try {
+    const { usuarioId } = req.params;
+
+    if (!req.file) {
+      return res.status(400).json({ mensaje: 'No se envió ninguna imagen' });
+    }
+
+    const nuevaUrl = req.file.path;
+
+    const perfilExistente = await perfilJugadorModel.buscarPorUsuarioId(usuarioId);
+    if (!perfilExistente) {
+      return res.status(404).json({ mensaje: 'Este usuario no tiene perfil creado todavía' });
+    }
+
+    if (perfilExistente.avatar_url) {
+      await eliminarImagen(perfilExistente.avatar_url);
+    }
+
+    const perfil = await perfilJugadorModel.actualizar(usuarioId, { avatar_url: nuevaUrl });
+    res.json({ mensaje: 'Foto de perfil actualizada', perfil });
+
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ mensaje: 'Error al actualizar la foto', error: error.message });
   }
 };
