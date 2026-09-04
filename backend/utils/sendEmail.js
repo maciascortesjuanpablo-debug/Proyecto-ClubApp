@@ -1,14 +1,8 @@
-import nodemailer from 'nodemailer';
+import { BrevoClient } from '@getbrevo/brevo';
 import dotenv from 'dotenv';
 dotenv.config();
 
-const transporter = nodemailer.createTransport({
-  service: 'gmail',
-  auth: {
-    user: process.env.EMAIL_USER,
-    pass: process.env.EMAIL_PASSWORD
-  }
-});
+const brevo = new BrevoClient({ apiKey: process.env.BREVO_API_KEY });
 
 export const generarCodigo = () => {
   return Math.floor(100000 + Math.random() * 900000).toString();
@@ -46,18 +40,18 @@ export const enviarCorreoCodigo = async (correoDestino, nombre, codigo) => {
       <span style="font-size: 34px; letter-spacing: 12px; font-weight: bold; color: #22d3ee;">${codigo}</span>
     </div>
 
-    <div style="display: flex; align-items: center; gap: 8px; background-color: rgba(34, 211, 238, 0.08); border-radius: 8px; padding: 12px 16px;">
+    <div style="background-color: rgba(34, 211, 238, 0.08); border-radius: 8px; padding: 12px 16px;">
       <p style="color: #67e8f9; font-size: 13px; margin: 0;">⏱️ Este código expira en <strong>2 minutos</strong> por tu seguridad.</p>
     </div>
 
     <p style="color: #6b7280; font-size: 12px; margin-top: 24px;">Si tú no solicitaste este código, puedes ignorar este correo con tranquilidad.</p>
   `;
 
-  await transporter.sendMail({
-    from: `"ClubApp" <${process.env.EMAIL_USER}>`,
-    to: correoDestino,
+  await brevo.transactionalEmails.sendTransacEmail({
     subject: '🔐 Tu código de verificación - ClubApp',
-    html: plantillaBase(contenido)
+    htmlContent: plantillaBase(contenido),
+    sender: { name: process.env.BREVO_SENDER_NAME, email: process.env.BREVO_SENDER_EMAIL },
+    to: [{ email: correoDestino, name: nombre }],
   });
 };
 
@@ -74,10 +68,10 @@ export const enviarCorreoConfirmacionCambio = async (correoDestino, nombre) => {
     </div>
   `;
 
-  await transporter.sendMail({
-    from: `"ClubApp" <${process.env.EMAIL_USER}>`,
-    to: correoDestino,
+  await brevo.transactionalEmails.sendTransacEmail({
     subject: '✅ Tu contraseña fue actualizada - ClubApp',
-    html: plantillaBase(contenido)
+    htmlContent: plantillaBase(contenido),
+    sender: { name: process.env.BREVO_SENDER_NAME, email: process.env.BREVO_SENDER_EMAIL },
+    to: [{ email: correoDestino, name: nombre }],
   });
 };
