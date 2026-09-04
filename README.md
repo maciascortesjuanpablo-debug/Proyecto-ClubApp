@@ -1,4 +1,8 @@
-🏆 ClubApp - Plataforma de Gestión Deportiva
+---
+
+# 🏆 CLUBAPP - PLATAFORMA DE GESTIÓN DEPORTIVA
+
+---
 
 APLICACIÓN MÓVIL PARA LA GESTIÓN INTEGRAL DE TORNEOS, EQUIPOS, CALENDARIOS Y ESTADÍSTICAS DEPORTIVAS, DESARROLLADA CON UNA ARQUITECTURA MODERNA Y ESCALABLE
 
@@ -134,14 +138,8 @@ La base de datos fue diseñada en **Supabase (PostgreSQL)** con más de 25 tabla
 
 - **Juan Pablo Macías Cortés**
   - *Tecnólogo en Análisis y Desarrollo de Software - SENA*
-  - **Especialidad**: Desarrollo backend, arquitectura cliente-servidor e integración de APIs RESTful.
-
+ 
 - **Andrés Felipe Triviño Bustos**
   - *Tecnólogo en Análisis y Desarrollo de Software - SENA*
-  - **Rol en el proyecto**: Desarrollo colaborativo de ClubApp.
 
 ---
-
-## 📄 Licencia
-
-Este proyecto fue desarrollado con fines académicos como proyecto final del programa Tecnólogo en Análisis y Desarrollo de Software del SENA (Ficha 3169657).
