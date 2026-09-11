@@ -46,7 +46,7 @@ export const usuarioModel = {
     return data;
   },
 
-  async actualizar(id, cambios) {
+  async actualizarUsuario(id, cambios) {
     const { data, error } = await supabase
       .from('usuarios')
       .update({ ...cambios, actualizado_en: new Date() })

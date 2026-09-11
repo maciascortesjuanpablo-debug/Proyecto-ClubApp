@@ -1,6 +1,6 @@
 import jwt from "jsonwebtoken";
 import { OAuth2Client } from "google-auth-library";
-import { obtenerPorEmail, crearUsuarioGoogle, actualizarUsuario } from "../models/usuario.js";
+import { crearUsuarioGoogle, usuarioModel } from "../models/usuario.js";
 
 const client = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
 
@@ -24,7 +24,7 @@ export const autenticarConGoogle = async (req, res) => {
     const { sub: googleId, email, name: nombre, picture: avatar } = payload;
 
     // 2. Comprobar si ya existe en Supabase
-    const { data: usuarioExistente } = await obtenerPorEmail(email);
+    const usuarioExistente = await usuarioModel.buscarPorCorreo(email);
 
     let usuarioFinal = null;
 
@@ -38,7 +38,7 @@ export const autenticarConGoogle = async (req, res) => {
       if (!usuarioExistente.isVerified) camposActualizar.isVerified = true;
 
       if (Object.keys(camposActualizar).length > 0) {
-        await actualizarUsuario(usuarioExistente.id, camposActualizar);
+        await usuarioModel.actualizarUsuario(usuarioExistente.id, camposActualizar);
       }
     } else {
       // LOGICA: Usuario nuevo
