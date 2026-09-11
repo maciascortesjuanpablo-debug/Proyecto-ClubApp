@@ -31,6 +31,7 @@ export const usuarioModel = {
       .select('id, nombre, apellido, correo, ciudad, rol_id, activo, creado_en')
       .order('creado_en', { ascending: false });
 
+
     if (error) throw error;
     return data;
   },
@@ -62,6 +63,7 @@ export const usuarioModel = {
     const { error } = await supabase
       .from('usuarios')
       .update({ password_hash: passwordHash, actualizado_en: new Date() })
+
       .eq('id', id);
 
     if (error) throw error;
@@ -87,21 +89,23 @@ export const usuarioModel = {
 };
 
 // 2. Función específica para los usuarios autenticados con Google
-export const crearUsuarioGoogle = async ({ nombre, email, googleId, avatar = null, rol = 'cliente' }) => {
+export const crearUsuarioGoogle = async ({ nombre, apellido, correo, googleId, avatar = null, rol_id = 'cliente' }) => {
   const { data, error } = await supabase
     .from('usuarios')
     .insert({
       nombre,
-      email,
-      password: null,              // No requiere contraseña
-      rol,
+      apellido,
+      correo,
+
+      password_hash: null,              // No requiere contraseña
+      rol_id,
       isVerified: true,            // Google ya validó este correo
       googleId,
       avatar,
       codigoVerificacion: null,
       codigoVerificacionExpiracion: null
     })
-    .select('id, nombre, email, rol, avatar')
+    .select('id, nombre, apellido, correo, rol_id, avatar')
     .single();
 
   return { data, error };
