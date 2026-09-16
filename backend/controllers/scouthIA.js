@@ -7,7 +7,7 @@ const groq = new Groq({ apiKey: process.env.GROQ_API_KEY });
    1. CHAT CON SCOUT AI
    Endpoint conversacional. Crea o continua una conversacion,
    consulta jugadores/torneos activos como contexto, y guarda
-   cada mensaje (usuario y asistente) en la tabla "mensajes".
+   cada mensaje (usuario y asistente) en la tabla "scout_ai_mensajes".
    ============================================================ */
 export const chatConScout = async (req, res) => {
   try {
@@ -47,7 +47,7 @@ export const chatConScout = async (req, res) => {
 
     // 2. Traer el historial reciente de esta conversacion (para darle memoria al modelo)
     const { data: historialPrevio, error: errorHistorial } = await supabase
-      .from("mensajes")
+      .from("scout_ai_mensajes")
       .select("rol, contenido")
       .eq("conversacion_id", idConversacion)
       .order("creado_en", { ascending: true })
@@ -119,8 +119,8 @@ REGLAS:
     const respuestaTexto =
       completion.choices[0]?.message?.content || "No pude generar una respuesta.";
 
-    // 5. Guardar pregunta y respuesta en "mensajes"
-    const { error: errorInsertMensajes } = await supabase.from("mensajes").insert([
+    // 5. Guardar pregunta y respuesta en "scout_ai_mensajes"
+    const { error: errorInsertMensajes } = await supabase.from("scout_ai_mensajes").insert([
       { conversacion_id: idConversacion, rol: "user", contenido: mensaje.trim() },
       { conversacion_id: idConversacion, rol: "asistente", contenido: respuestaTexto },
     ]);
@@ -153,7 +153,7 @@ export const obtenerHistorialScout = async (req, res) => {
     const { conversacionId } = req.params;
 
     const { data: historial, error } = await supabase
-      .from("mensajes")
+      .from("scout_ai_mensajes")
       .select("rol, contenido, creado_en")
       .eq("conversacion_id", conversacionId)
       .order("creado_en", { ascending: true });
