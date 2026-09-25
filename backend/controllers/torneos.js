@@ -88,7 +88,7 @@ export const eliminarTorneo = async (req, res) => {
   }
 };
 
-// ---- GRUPOS ----
+// GRUPOS
 
 export const crearGrupo = async (req, res) => {
   try {

@@ -33,7 +33,7 @@ export const actualizarUsuario = async (req, res) => {
     // Bloqueamos campos sensibles que no deben cambiarse por esta ruta
     const { password, password_hash, rol_id, correo_verificado, activo, correo, ...datosPermitidos } = req.body;
 
-    const usuarioActualizado = await usuarioModel.actualizar(id, datosPermitidos);
+    const usuarioActualizado = await usuarioModel.actualizarUsuario(id, datosPermitidos);
     res.json({ mensaje: 'Usuario actualizado', usuario: usuarioActualizado });
 
   } catch (error) {

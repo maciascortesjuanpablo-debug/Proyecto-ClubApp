@@ -1,5 +1,6 @@
-import 'package:clubapp_frontend/pantallas/home_page.dart';
-import 'package:clubapp_frontend/pantallas/login_page.dart';
+import 'package:clubapp_frontend/screens/home_page.dart';
+import 'package:clubapp_frontend/screens/login_page.dart';
+import 'package:clubapp_frontend/screens/splash_page.dart';
 import 'package:flutter/material.dart';
 
 void main() {
@@ -13,7 +14,7 @@ class MyApp extends StatelessWidget {
   Widget build(BuildContext context) {
     return MaterialApp(
       title: 'ClubApp',
-      home: const LoginPage(),
+      home: const SplashScreen(),
       debugShowCheckedModeBanner: false,
     );
   }

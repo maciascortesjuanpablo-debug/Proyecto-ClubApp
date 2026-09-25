@@ -19,7 +19,7 @@ export const inscripcionModel = {
     const { data, error } = await supabase
       .from('inscripciones_equipo')
       .select(`
-        id, estado, fecha_inscripcion, grupo_id,
+        id, estado, fecha_inscripcion,
         equipos ( id, nombre, logo_url )
       `)
       .eq('torneo_id', torneo_id);

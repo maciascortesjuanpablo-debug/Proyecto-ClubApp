@@ -1,34 +1,42 @@
 import 'package:flutter/material.dart';
 import '../core/app_colors.dart';
-import '../core/app_text_styles.dart';
 
-class CustomButton extends StatelessWidget {
+class AppButton extends StatelessWidget {
   final String label;
-  final VoidCallback onPressed;
+  final VoidCallback? onPressed;
   final bool isLoading;
-  final Color? backgroundColor;
-  final Color? textColor;
+  final Color backgroundColor;
+  final Color textColor;
+  final double height;
+  final double borderRadius;
+  final double fontSize;
+  final double width;
 
-  const CustomButton({
+  const AppButton({
+    Key? key,
     required this.label,
     required this.onPressed,
     this.isLoading = false,
     this.backgroundColor = AppColors.primary,
     this.textColor = AppColors.textWhite,
-  });
+    this.height = 50,
+    this.borderRadius = 12,
+    this.fontSize = 16,
+    this.width = double.infinity,
+  }) : super(key: key);
 
   @override
   Widget build(BuildContext context) {
     return SizedBox(
-      width: double.infinity,
-      height: 50,
+      width: width,
+      height: height,
       child: ElevatedButton(
         onPressed: isLoading ? null : onPressed,
         style: ElevatedButton.styleFrom(
           backgroundColor: backgroundColor,
-          disabledBackgroundColor: backgroundColor?.withOpacity(0.5),
+          disabledBackgroundColor: backgroundColor.withOpacity(0.5),
           shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(12),
+            borderRadius: BorderRadius.circular(borderRadius),
           ),
           elevation: 0,
         ),
@@ -41,7 +49,14 @@ class CustomButton extends StatelessWidget {
                   strokeWidth: 2,
                 ),
               )
-            : Text(label, style: AppTextStyles.button),
+            : Text(
+                label,
+                style: TextStyle(
+                  color: textColor,
+                  fontWeight: FontWeight.bold,
+                  fontSize: fontSize,
+                ),
+              ),
       ),
     );
   }
