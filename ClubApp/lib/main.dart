@@ -1,6 +1,8 @@
 import 'package:clubapp_frontend/screens/home_page.dart';
 import 'package:clubapp_frontend/screens/login_page.dart';
+import 'package:clubapp_frontend/screens/profile_page.dart';
 import 'package:clubapp_frontend/screens/splash_page.dart';
+import 'package:clubapp_frontend/screens/verify_code_page.dart';
 import 'package:flutter/material.dart';
 
 void main() {
@@ -20,6 +22,3 @@ class MyApp extends StatelessWidget {
   }
 }
 
-// Para importar LoginPage y HomePage:
-// import 'lib/presentation/pages/auth/login_page.dart';
-// import 'lib/presentation/pages/home/home_page.dart';

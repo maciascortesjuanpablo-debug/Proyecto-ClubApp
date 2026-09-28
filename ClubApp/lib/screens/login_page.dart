@@ -1,3 +1,4 @@
+import 'package:clubapp_frontend/screens/forgot_password_page.dart';
 import 'package:flutter/material.dart';
 import '../core/app_colors.dart';
 import '../core/validators.dart';
@@ -86,10 +87,16 @@ class _LoginPageState extends State<LoginPage> {
                 // Forgot Password Link
                 Align(
                   alignment: Alignment.centerRight,
-                  child: NavigationLink(
-                    normalText: '¿Olvidaste tu contraseña?',
-                    actionText: '',
-                    onTap: () {},
+                  child: NavigationLink(normalText: '',
+                    actionText: '¿Olvidaste tu contraseña?',
+                    onTap: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) => const ForgotPasswordPage(),
+                        ),
+                      );
+                    },
                   ),
                 ),
 
