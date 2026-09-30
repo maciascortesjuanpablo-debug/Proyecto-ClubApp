@@ -83,8 +83,8 @@ class _RegisterPage3State extends State<RegisterPage3> {
 
                 // Logo
                 Container(
-                  width: 200,
-                  height: 200,
+                  width: 150,
+                  height: 150,
                   child: ClipRRect(
                     borderRadius: BorderRadius.circular(12),
                     child: Image.asset(

@@ -114,7 +114,7 @@ class _RegisterPage1State extends State<RegisterPage1> {
                     // Name
                     AppTextField(
                       label: 'Nombre',
-                      hint: 'Juan',
+                      hint: 'Juan Pablo',
                       controller: _nameController,
                       validator: AppValidators.validateName,
                     ),
@@ -123,7 +123,7 @@ class _RegisterPage1State extends State<RegisterPage1> {
                     // Lastnames
                     AppTextField(
                       label: 'Apellidos',
-                      hint: 'Pérez García',
+                      hint: 'Triviño Bustos',
                       controller: _lastnamesController,
                       validator: AppValidators.validateLastNames,
                     ),

@@ -1,4 +1,4 @@
-import 'package:clubapp_frontend/screens/RegisterPage3.dart';
+import '../screens/RegisterPage3.dart';
 import 'package:flutter/material.dart';
 import '../core/app_colors.dart';
 import '../components/back_button_widget.dart';

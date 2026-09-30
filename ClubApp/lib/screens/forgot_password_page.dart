@@ -1,4 +1,4 @@
-import 'package:clubapp_frontend/screens/verify_code_page.dart';
+import '../screens/verify_code_page.dart';
 import 'package:flutter/material.dart';
 import '../core/app_colors.dart';
 import '../core/validators.dart';

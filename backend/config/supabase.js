@@ -1,4 +1,4 @@
-p//Variables de entorno
+//Variables de entorno
 import dotenv from 'dotenv/config';
 import { createClient } from '@supabase/supabase-js';
 
