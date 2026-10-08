@@ -1,4 +1,6 @@
-import '../screens/RegisterPage3.dart';
+import 'package:ClubApp/components/citydrop_down.dart';
+
+import '../screens/Registerpage3.dart';
 import 'package:flutter/material.dart';
 import '../core/app_colors.dart';
 import '../components/back_button_widget.dart';
@@ -7,8 +9,22 @@ import '../components/app_text_field.dart';
 import '../components/app_button.dart';
 import '../components/form_section.dart';
 
+
 class RegisterPage2 extends StatefulWidget {
-  const RegisterPage2({Key? key}) : super(key: key);
+  final String nombre;
+  final String apellido;
+  final String correo;
+  final String celular;
+  final String fechaNacimiento;
+
+  const RegisterPage2({
+    Key? key,
+    required this.nombre,
+    required this.apellido,
+    required this.correo,
+    required this.celular,
+    required this.fechaNacimiento,
+  }) : super(key: key);
 
   @override
   State<RegisterPage2> createState() => _RegisterPage2State();
@@ -16,10 +32,10 @@ class RegisterPage2 extends StatefulWidget {
 
 class _RegisterPage2State extends State<RegisterPage2> {
   final TextEditingController _positionController = TextEditingController();
-  final TextEditingController _cityController = TextEditingController();
   final _formKey = GlobalKey<FormState>();
 
   String? _selectedRole;
+  String? _selectedCity;
   String _selectedLevel = 'Amateur Competitivo';
 
   @override
@@ -86,10 +102,23 @@ class _RegisterPage2State extends State<RegisterPage2> {
                         controller: _positionController,
                       ),
                       const SizedBox(height: 16),
-                      AppTextField(
-                        label: 'Ciudad',
-                        hint: 'Tu ciudad',
-                        controller: _cityController,
+                      Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const Text(
+                            'Departamento',
+                            style: TextStyle(
+                              fontSize: 13,
+                              fontWeight: FontWeight.w600,
+                              color: AppColors.textWhite,
+                            ),
+                          ),
+                          const SizedBox(height: 10),
+                          CityDropdown(
+                            selectedCity: _selectedCity,
+                            onChanged: (city) => setState(() => _selectedCity = city),
+                          ),
+                        ],
                       ),
                       const SizedBox(height: 24),
                       Column(
@@ -108,11 +137,9 @@ class _RegisterPage2State extends State<RegisterPage2> {
                             mainAxisAlignment: MainAxisAlignment.spaceBetween,
                             children: [
                               _buildRoleButton('Jugador', Icons.person_3, 0),
-                              _buildRoleButton(
-                                  'Entrenador', Icons.sports_score, 1),
+                              _buildRoleButton('Entrenador', Icons.sports_score, 1),
                               _buildRoleButton('Organizador', Icons.groups, 2),
-                              _buildRoleButton(
-                                  'Árbitro', Icons.sports_score_outlined, 3),
+                              _buildRoleButton('Árbitro', Icons.sports_score_outlined, 3),
                             ],
                           ),
                         ],
@@ -133,11 +160,9 @@ class _RegisterPage2State extends State<RegisterPage2> {
                           Container(
                             padding: const EdgeInsets.symmetric(horizontal: 14),
                             decoration: BoxDecoration(
-                              color: AppColors.primary.withValues(alpha: 0.5),
+                              color: AppColors.primary.withOpacity(0.5),
                               borderRadius: BorderRadius.circular(10),
-                              border: Border.all(
-                                color: const Color(0xFF334155),
-                              ),
+                              border: Border.all(color: const Color(0xFF334155)),
                             ),
                             child: DropdownButton<String>(
                               value: _selectedLevel,
@@ -145,27 +170,17 @@ class _RegisterPage2State extends State<RegisterPage2> {
                               underline: const SizedBox(),
                               dropdownColor: AppColors.bgCard,
                               onChanged: (String? newValue) {
-                                setState(() {
-                                  _selectedLevel =
-                                      newValue ?? 'Amateur Competitivo';
-                                });
+                                setState(() => _selectedLevel = newValue ?? 'Amateur Competitivo');
                               },
                               items: [
                                 'Principiante',
                                 'Intermedio',
                                 'Amateur Competitivo',
                                 'Profesional',
-                              ]
-                                  .map<DropdownMenuItem<String>>(
-                                      (String value) {
+                              ].map<DropdownMenuItem<String>>((String value) {
                                 return DropdownMenuItem<String>(
                                   value: value,
-                                  child: Text(
-                                    value,
-                                    style: const TextStyle(
-                                      color: AppColors.textWhite,
-                                    ),
-                                  ),
+                                  child: Text(value, style: const TextStyle(color: AppColors.textWhite)),
                                 );
                               }).toList(),
                             ),
@@ -179,17 +194,25 @@ class _RegisterPage2State extends State<RegisterPage2> {
                     label: 'Continuar',
                     onPressed: () {
                       if (_selectedRole == null) {
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(
-                            content: Text('Por favor selecciona un rol'),
-                          ),
-                        );
+                        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Por favor selecciona un rol')));
+                        return;
+                      }
+                      if (_selectedCity == null) {
+                        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Por favor selecciona un departamento')));
                         return;
                       }
                       Navigator.push(
                         context,
                         MaterialPageRoute(
-                          builder: (context) => const RegisterPage3(),
+                          builder: (context) => RegisterPage3(
+                            nombre: widget.nombre,
+                            apellido: widget.apellido,
+                            correo: widget.correo,
+                            celular: widget.celular,
+                            fechaNacimiento: widget.fechaNacimiento,
+                            ciudad: _selectedCity!,
+                            posicion: _positionController.text.trim(),
+                          ),
                         ),
                       );
                     },
@@ -209,41 +232,25 @@ class _RegisterPage2State extends State<RegisterPage2> {
     bool isSelected = _selectedRole == label;
     return Expanded(
       child: GestureDetector(
-        onTap: () {
-          setState(() => _selectedRole = label);
-        },
+        onTap: () => setState(() => _selectedRole = label),
         child: Container(
           padding: const EdgeInsets.symmetric(vertical: 12),
           decoration: BoxDecoration(
-            color: isSelected
-                ? AppColors.primaryLight.withOpacity(0.3)
-                : AppColors.primary.withOpacity(0.3),
+            color: isSelected ? AppColors.primaryLight.withOpacity(0.3) : AppColors.primary.withOpacity(0.3),
             borderRadius: BorderRadius.circular(10),
-            border: Border.all(
-              color: isSelected
-                  ? AppColors.primaryLight
-                  : const Color(0xFF334155),
-              width: isSelected ? 2 : 1,
-            ),
+            border: Border.all(color: isSelected ? AppColors.primaryLight : const Color(0xFF334155), width: isSelected ? 2 : 1),
           ),
           child: Column(
             children: [
-              Icon(
-                icon,
-                color: isSelected ? AppColors.primaryLight : AppColors.textGray,
-                size: 24,
-              ),
+              Icon(icon, color: isSelected ? AppColors.primaryLight : AppColors.textGray, size: 24),
               const SizedBox(height: 6),
               Text(
                 label,
                 textAlign: TextAlign.center,
                 style: TextStyle(
                   fontSize: 11,
-                  color: isSelected
-                      ? AppColors.primaryLight
-                      : AppColors.textGray,
-                  fontWeight:
-                      isSelected ? FontWeight.w600 : FontWeight.w500,
+                  color: isSelected ? AppColors.primaryLight : AppColors.textGray,
+                  fontWeight: isSelected ? FontWeight.w600 : FontWeight.w500,
                 ),
               ),
             ],
@@ -256,7 +263,6 @@ class _RegisterPage2State extends State<RegisterPage2> {
   @override
   void dispose() {
     _positionController.dispose();
-    _cityController.dispose();
     super.dispose();
   }
 }

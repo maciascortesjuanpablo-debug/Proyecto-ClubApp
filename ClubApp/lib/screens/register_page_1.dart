@@ -170,7 +170,13 @@ class _RegisterPage1State extends State<RegisterPage1> {
                       Navigator.push(
                         context,
                         MaterialPageRoute(
-                          builder: (context) => const RegisterPage2(),
+                          builder: (context) => RegisterPage2(
+                            nombre: _nameController.text.trim(),
+                            apellido: _lastnamesController.text.trim(),
+                            correo: _emailController.text.trim(),
+                            celular: _phoneController.text.trim(),
+                            fechaNacimiento: _birthdateController.text.trim(), // formato DD/MM/YYYY
+                          ),
                         ),
                       );
                     }
