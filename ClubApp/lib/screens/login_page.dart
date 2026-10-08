@@ -8,6 +8,8 @@ import '../components/app_button.dart';
 import '../components/divider_with_text.dart';
 import '../components/social_button.dart';
 import '../components/navigation_link.dart';
+import '../components/success_dialog.dart';
+import '../services/auth_service.dart';
 import 'register_page_1.dart';
 import 'home_page.dart';
 
@@ -22,6 +24,7 @@ class _LoginPageState extends State<LoginPage> {
   final _formKey = GlobalKey<FormState>();
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
+  bool _cargando = false;
 
   @override
   void dispose() {
@@ -30,11 +33,44 @@ class _LoginPageState extends State<LoginPage> {
     super.dispose();
   }
 
-  void _login() {
-    if (_formKey.currentState?.validate() ?? false) {
-      Navigator.pushReplacement(
-        context,
-        MaterialPageRoute(builder: (context) => const HomePage()),
+  Future<void> _login() async {
+    if (!(_formKey.currentState?.validate() ?? false)) return;
+
+    setState(() => _cargando = true);
+
+    final resultado = await AuthService.iniciarSesion(
+      correo: _emailController.text.trim(),
+      password: _passwordController.text,
+    );
+
+    if (!mounted) return;
+    setState(() => _cargando = false);
+
+    if (resultado['exito']) {
+      final nombre = AuthService.usuario?['nombre'] ?? '';
+      await SuccessDialog.show(
+        context: context,
+        title: '¡Bienvenido de nuevo!',
+        message: nombre.isNotEmpty ? 'Hola de nuevo, $nombre' : 'Inicio de sesión exitoso',
+        buttonText: 'Continuar',
+        onButtonPressed: () {
+          Navigator.pushReplacement(
+            context,
+            MaterialPageRoute(builder: (context) => const HomePage()),
+          );
+        },
+      );
+    } else {
+      showDialog(
+        context: context,
+        builder: (c) => AlertDialog(
+          backgroundColor: const Color(0xFF1E293B),
+          title: const Text('Error', style: TextStyle(color: Colors.white)),
+          content: Text(resultado['mensaje'], style: const TextStyle(color: Color(0xFF94A3B8))),
+          actions: [
+            TextButton(onPressed: () => Navigator.pop(c), child: const Text('Cerrar')),
+          ],
+        ),
       );
     }
   }
@@ -62,7 +98,6 @@ class _LoginPageState extends State<LoginPage> {
 
                 const SizedBox(height: 40),
 
-                // Email Field
                 AppTextField(
                   label: 'Correo Electrónico',
                   hint: 'tu@email.com',
@@ -72,7 +107,6 @@ class _LoginPageState extends State<LoginPage> {
 
                 const SizedBox(height: 16),
 
-                // Password Field
                 AppTextField(
                   label: 'Contraseña',
                   hint: '••••••••',
@@ -84,10 +118,10 @@ class _LoginPageState extends State<LoginPage> {
 
                 const SizedBox(height: 12),
 
-                // Forgot Password Link
                 Align(
                   alignment: Alignment.centerRight,
-                  child: NavigationLink(normalText: '',
+                  child: NavigationLink(
+                    normalText: '',
                     actionText: '¿Olvidaste tu contraseña?',
                     onTap: () {
                       Navigator.push(
@@ -102,20 +136,17 @@ class _LoginPageState extends State<LoginPage> {
 
                 const SizedBox(height: 24),
 
-                // Login Button
                 AppButton(
-                  label: 'Iniciar Sesión',
-                  onPressed: _login,
+                  label: _cargando ? 'Ingresando...' : 'Iniciar Sesión',
+                  onPressed: _cargando ? () {} : _login,
                 ),
 
                 const SizedBox(height: 24),
 
-                // Divider
                 const DividerWithText(text: 'O continúa con'),
 
                 const SizedBox(height: 16),
 
-                // Social Buttons
                 Row(
                   children: [
                     Expanded(
@@ -138,7 +169,6 @@ class _LoginPageState extends State<LoginPage> {
 
                 const SizedBox(height: 24),
 
-                // Sign Up Link
                 NavigationLink(
                   normalText: '¿No tienes cuenta? ',
                   actionText: 'Regístrate',

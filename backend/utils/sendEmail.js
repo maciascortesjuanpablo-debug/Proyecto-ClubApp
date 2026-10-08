@@ -1,8 +1,11 @@
-import { BrevoClient } from '@getbrevo/brevo';
+import * as brevo from '@getbrevo/brevo';
 import dotenv from 'dotenv';
 dotenv.config();
 
-const brevo = new BrevoClient({ apiKey: process.env.BREVO_API_KEY });
+const apiInstance = new brevo.TransactionalEmailsApi();
+apiInstance.setApiKey(brevo.TransactionalEmailsApiApiKeys.apiKey, process.env.BREVO_API_KEY);
+
+const LOGO_URL = 'https://res.cloudinary.com/xkwp03du/image/upload/v1791131589/logo1.png';
 
 export const generarCodigo = () => {
   return Math.floor(100000 + Math.random() * 900000).toString();
@@ -14,7 +17,7 @@ const plantillaBase = (contenido) => `
     <div style="max-width: 420px; margin: 0 auto; background-color: #111827; border-radius: 16px; overflow: hidden; border: 1px solid #1f2937;">
 
       <div style="background: linear-gradient(135deg, #0891b2, #0e7490); padding: 28px; text-align: center;">
-        <div style="width: 48px; height: 48px; background: white; border-radius: 12px; margin: 0 auto 12px; display: flex; align-items: center; justify-content: center; font-weight: bold; font-size: 22px; color: #0891b2;">C</div>
+        <img src="${LOGO_URL}" alt="ClubApp" width="56" height="56" style="display: block; margin: 0 auto 12px; border-radius: 12px;">
         <h1 style="color: white; margin: 0; font-size: 20px; letter-spacing: 1px;">CLUBAPP</h1>
         <p style="color: #cffafe; margin: 4px 0 0; font-size: 13px;">Tu plataforma deportiva</p>
       </div>
@@ -47,12 +50,13 @@ export const enviarCorreoCodigo = async (correoDestino, nombre, codigo) => {
     <p style="color: #6b7280; font-size: 12px; margin-top: 24px;">Si tú no solicitaste este código, puedes ignorar este correo con tranquilidad.</p>
   `;
 
-  await brevo.transactionalEmails.sendTransacEmail({
-    subject: '🔐 Tu código de verificación - ClubApp',
-    htmlContent: plantillaBase(contenido),
-    sender: { name: process.env.BREVO_SENDER_NAME, email: process.env.BREVO_SENDER_EMAIL },
-    to: [{ email: correoDestino, name: nombre }],
-  });
+  const email = new brevo.SendSmtpEmail();
+  email.subject = '🔐 Tu código de verificación - ClubApp';
+  email.htmlContent = plantillaBase(contenido);
+  email.sender = { name: process.env.BREVO_SENDER_NAME, email: process.env.BREVO_SENDER_EMAIL };
+  email.to = [{ email: correoDestino, name: nombre }];
+
+  await apiInstance.sendTransacEmail(email);
 };
 
 export const enviarCorreoConfirmacionCambio = async (correoDestino, nombre) => {
@@ -68,10 +72,11 @@ export const enviarCorreoConfirmacionCambio = async (correoDestino, nombre) => {
     </div>
   `;
 
-  await brevo.transactionalEmails.sendTransacEmail({
-    subject: '✅ Tu contraseña fue actualizada - ClubApp',
-    htmlContent: plantillaBase(contenido),
-    sender: { name: process.env.BREVO_SENDER_NAME, email: process.env.BREVO_SENDER_EMAIL },
-    to: [{ email: correoDestino, name: nombre }],
-  });
+  const email = new brevo.SendSmtpEmail();
+  email.subject = '✅ Tu contraseña fue actualizada - ClubApp';
+  email.htmlContent = plantillaBase(contenido);
+  email.sender = { name: process.env.BREVO_SENDER_NAME, email: process.env.BREVO_SENDER_EMAIL };
+  email.to = [{ email: correoDestino, name: nombre }];
+
+  await apiInstance.sendTransacEmail(email);
 };

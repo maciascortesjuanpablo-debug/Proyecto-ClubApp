@@ -1,8 +1,6 @@
+import 'package:ClubApp/screens/splash_page.dart';
+
 import '../screens/home_page.dart';
-import '../screens/login_page.dart';
-import '../screens/profile_page.dart';
-import '../screens/splash_page.dart';
-import '../screens/verify_code_page.dart';
 import 'package:flutter/material.dart';
 
 void main() {

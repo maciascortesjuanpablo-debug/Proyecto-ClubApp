@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'dart:async';
 import '../core/app_colors.dart';
 import '../components/app_button.dart';
+import '../services/auth_service.dart';
+import 'new_password_page.dart'; // ajusta el nombre si tu archivo se llama distinto
 
 class VerifyCodePage extends StatefulWidget {
   final String email;
@@ -22,6 +24,7 @@ class _VerifyCodePageState extends State<VerifyCodePage> {
   int _secondsRemaining = 120;
   late Timer _timer;
   bool _canResend = false;
+  bool _cargando = false;
 
   @override
   void initState() {
@@ -58,29 +61,61 @@ class _VerifyCodePageState extends State<VerifyCodePage> {
     }
   }
 
-  void _verifyCode() {
+  Future<void> _verifyCode() async {
     String code = _codeControllers.map((c) => c.text).join();
-    if (code.length == 6) {
-      // Lógica de verificación
+
+    if (code.length != 6) {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Código ingresado: $code')),
+        const SnackBar(content: Text('Ingresa los 6 dígitos')),
+      );
+      return;
+    }
+
+    setState(() => _cargando = true);
+
+    final resultado = await AuthService.verificarCodigoRecuperacion(
+      correo: widget.email,
+      codigo: code,
+    );
+
+    if (!mounted) return;
+    setState(() => _cargando = false);
+
+    if (resultado['exito']) {
+      Navigator.pushReplacement(
+        context,
+        MaterialPageRoute(
+          builder: (context) => NewPasswordPage(
+            tokenTemporal: resultado['tokenTemporal'],
+          ),
+        ),
       );
     } else {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Ingresa los 6 dígitos')),
+        SnackBar(content: Text(resultado['mensaje'])),
       );
     }
   }
 
-  void _resendCode() {
-    setState(() {
-      _secondsRemaining = 120;
-      _canResend = false;
-      for (var controller in _codeControllers) {
-        controller.clear();
-      }
-    });
-    _startTimer();
+  Future<void> _resendCode() async {
+    final resultado = await AuthService.enviarCodigoRecuperacion(correo: widget.email);
+
+    if (!mounted) return;
+
+    if (resultado['exito']) {
+      setState(() {
+        _secondsRemaining = 120;
+        _canResend = false;
+        for (var controller in _codeControllers) {
+          controller.clear();
+        }
+      });
+      _startTimer();
+    } else {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(resultado['mensaje'])),
+      );
+    }
   }
 
   @override
@@ -259,8 +294,8 @@ class _VerifyCodePageState extends State<VerifyCodePage> {
 
               // Verify Button
               AppButton(
-                label: 'Verificar Código',
-                onPressed: _verifyCode,
+                label: _cargando ? 'Verificando...' : 'Verificar Código',
+                onPressed: _cargando ? () {} : _verifyCode,
               ),
 
               const SizedBox(height: 20),

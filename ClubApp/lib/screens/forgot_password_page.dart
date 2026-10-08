@@ -4,6 +4,7 @@ import '../core/app_colors.dart';
 import '../core/validators.dart';
 import '../components/app_text_field.dart';
 import '../components/app_button.dart';
+import '../services/auth_service.dart';
 
 class ForgotPasswordPage extends StatefulWidget {
   const ForgotPasswordPage({Key? key}) : super(key: key);
@@ -16,6 +17,7 @@ class _ForgotPasswordPageState extends State<ForgotPasswordPage> {
   final _formKey = GlobalKey<FormState>();
   final _emailController = TextEditingController();
   final _confirmEmailController = TextEditingController();
+  bool _cargando = false;
 
   @override
   void dispose() {
@@ -24,20 +26,35 @@ class _ForgotPasswordPageState extends State<ForgotPasswordPage> {
     super.dispose();
   }
 
-  void _sendCode() {
-    if (_formKey.currentState?.validate() ?? false) {
-      if (_emailController.text != _confirmEmailController.text) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Los correos no coinciden')),
-        );
-        return;
-      }
-      // Navegar a pantalla de verificación
+  Future<void> _sendCode() async {
+    if (!(_formKey.currentState?.validate() ?? false)) return;
+
+    if (_emailController.text != _confirmEmailController.text) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Los correos no coinciden')),
+      );
+      return;
+    }
+
+    setState(() => _cargando = true);
+
+    final resultado = await AuthService.enviarCodigoRecuperacion(
+      correo: _emailController.text.trim(),
+    );
+
+    if (!mounted) return;
+    setState(() => _cargando = false);
+
+    if (resultado['exito']) {
       Navigator.push(
         context,
         MaterialPageRoute(
-          builder: (context) => VerifyCodePage(email: _emailController.text),
+          builder: (context) => VerifyCodePage(email: _emailController.text.trim()),
         ),
+      );
+    } else {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(resultado['mensaje'])),
       );
     }
   }
@@ -142,18 +159,13 @@ class _ForgotPasswordPageState extends State<ForgotPasswordPage> {
                   controller: _confirmEmailController,
                   validator: AppValidators.validateEmail,
                 ),
-
                 const SizedBox(height: 32),
-
                 // Send Code Button
                 AppButton(
-                  label: 'Enviar código',
-                  onPressed: _sendCode,
+                  label: _cargando ? 'Enviando...' : 'Enviar código',
+                  onPressed: _cargando ? () {} : _sendCode,
                 ),
-
                 const SizedBox(height: 12),
-
-                // Cancel Button
                 SizedBox(
                   width: double.infinity,
                   height: 50,
