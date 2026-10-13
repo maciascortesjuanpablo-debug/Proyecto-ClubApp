@@ -1,9 +1,10 @@
 import 'package:flutter/material.dart';
 import '../core/app_colors.dart';
 
+/// Tarjeta de un partido destacado (liga, estado, escudos y marcador)
 class MatchCard extends StatelessWidget {
   final String team1, team1Init, team2, team2Init, league, status;
-  final int score1, score2;
+  final int score1, score2, minuto;
 
   const MatchCard({
     super.key,
@@ -15,70 +16,61 @@ class MatchCard extends StatelessWidget {
     required this.score2,
     required this.league,
     required this.status,
+    this.minuto = 0,
   });
 
   @override
   Widget build(BuildContext context) {
-    final t = Theme.of(context).textTheme;
-    Widget score(int s, Color c) => Text('$s', style: t.headlineMedium?.copyWith(color: c, fontWeight: FontWeight.bold));
-
+    final vivo = status == 'En vivo';
     return Container(
-      height: 300,
-      decoration: BoxDecoration(
-        color: AppColors.bgCard,
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: AppColors.primaryLight, width: 2),
-      ),
-      padding: const EdgeInsets.all(24),
-      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(color: AppColors.bgCard, borderRadius: BorderRadius.circular(16)),
+      child: Column(children: [
         Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
-          Text(league, style: t.labelMedium?.copyWith(color: AppColors.secondary, fontWeight: FontWeight.w600)),
+          Expanded(
+            child: Text(league,
+                maxLines: 1,
+
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(color: AppColors.primaryLight, fontSize: 11, fontWeight: FontWeight.w700, letterSpacing: 0.5)),
+          ),
+          const SizedBox(width: 8),
           Container(
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-            decoration: BoxDecoration(color: AppColors.success, borderRadius: BorderRadius.circular(6)),
-            child: Text(status, style: const TextStyle(color: AppColors.bgDark, fontSize: 12, fontWeight: FontWeight.w600)),
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+            decoration: BoxDecoration(color: vivo ? AppColors.blue : AppColors.bgCardLight, borderRadius: BorderRadius.circular(12)),
+            child: Text(vivo ? "En vivo $minuto'" : status,
+                style: const TextStyle(color: AppColors.textWhite, fontSize: 10.5, fontWeight: FontWeight.bold)),
           ),
         ]),
-        const SizedBox(height: 16),
-        Expanded(
-          child: Row(mainAxisAlignment: MainAxisAlignment.spaceAround, children: [
-            _team(t, team1, team1Init),
-            FittedBox(
-              fit: BoxFit.scaleDown,
-              child: Column(mainAxisSize: MainAxisSize.min, children: [
-                score(score1, AppColors.secondary),
-                Text('vs', style: t.bodyMedium?.copyWith(color: AppColors.textGray, fontWeight: FontWeight.w600)),
-                score(score2, AppColors.success),
-              ]),
-            ),
-            _team(t, team2, team2Init),
-          ]),
-        ),
-        const SizedBox(height: 16),
-        SizedBox(
-          width: double.infinity,
-          height: 44,
-          child: ElevatedButton(
-            onPressed: () {},
-            style: ElevatedButton.styleFrom(backgroundColor: AppColors.primaryLight, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12))),
-            child: Text('Ver detalles', style: t.bodyMedium?.copyWith(color: AppColors.textWhite, fontWeight: FontWeight.w600)),
+        const SizedBox(height: 14),
+        Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          Expanded(child: _team(team1, team1Init, AppColors.primary)),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 8),
+            child: Column(children: [
+              SizedBox(
+                height: 52,
+                child: Center(child: Text('$score1 : $score2', style: const TextStyle(fontSize: 30, color: AppColors.textWhite, fontWeight: FontWeight.bold))),
+              ),
+              const SizedBox(height: 8),
+              const Text('VS', style: TextStyle(fontSize: 11, color: AppColors.textGray, fontWeight: FontWeight.bold)),
+            ]),
           ),
-        ),
+          Expanded(child: _team(team2, team2Init, const Color(0xFF14532D))),
+        ]),
       ]),
     );
   }
 
-  Widget _team(TextTheme t, String name, String init) => Column(mainAxisAlignment: MainAxisAlignment.center, children: [
-    Container(
-      width: 60,
-      height: 60,
-      decoration: BoxDecoration(color: AppColors.primaryLight, borderRadius: BorderRadius.circular(12)),
-      child: Center(child: Text(init, style: const TextStyle(color: AppColors.textWhite, fontWeight: FontWeight.bold, fontSize: 18))),
-    ),
-    const SizedBox(height: 8),
-    SizedBox(
-      width: 80,
-      child: Text(name, style: t.bodySmall?.copyWith(color: AppColors.textGray, fontWeight: FontWeight.w600), textAlign: TextAlign.center, maxLines: 2, overflow: TextOverflow.ellipsis),
-    ),
-  ]);
+  Widget _team(String name, String init, Color color) => Column(children: [
+
+        Container(
+          width: 52,
+          height: 52,
+          decoration: BoxDecoration(color: color, shape: BoxShape.circle),
+          child: Center(child: Text(init, style: TextStyle(color: AppColors.textWhite.withValues(alpha: 0.7), fontSize: 14, fontWeight: FontWeight.bold))),
+        ),
+        const SizedBox(height: 8),
+        Text(name, maxLines: 1, overflow: TextOverflow.ellipsis, textAlign: TextAlign.center, style: const TextStyle(fontSize: 11, color: AppColors.textWhite, fontWeight: FontWeight.bold)),
+      ]);
 }

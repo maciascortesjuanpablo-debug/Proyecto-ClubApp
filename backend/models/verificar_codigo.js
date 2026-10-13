@@ -1,21 +1,15 @@
 import { supabase } from '../config/supabase.js';
+import { datos } from '../utils/helpers.js';
+
+const codigos = () => supabase.from('codigos_verificacion');
 
 export const codigoVerificacionModel = {
-
   async crear({ usuario_id, codigo, tipo, expira_en }) {
-    const { data, error } = await supabase
-      .from('codigos_verificacion')
-      .insert({ usuario_id, codigo, tipo, expira_en })
-      .select()
-      .single();
-
-    if (error) throw error;
-    return data;
+    return datos(await codigos().insert({ usuario_id, codigo, tipo, expira_en }).select().single());
   },
 
   async buscarValido({ usuario_id, codigo }) {
-    const { data, error } = await supabase
-      .from('codigos_verificacion')
+    return datos(await codigos()
       .select('*')
       .eq('usuario_id', usuario_id)
       .eq('codigo', codigo)
@@ -23,18 +17,15 @@ export const codigoVerificacionModel = {
       .gte('expira_en', new Date().toISOString())
       .order('creado_en', { ascending: false })
       .limit(1)
-      .maybeSingle();
-
-    if (error) throw error;
-    return data;
+      .maybeSingle());
   },
 
   async marcarUsado(id) {
-    const { error } = await supabase
-      .from('codigos_verificacion')
-      .update({ usado: true })
-      .eq('id', id);
+    datos(await codigos().update({ usado: true }).eq('id', id));
+  },
 
-    if (error) throw error;
-  }
+  // Anula los códigos pendientes del usuario (al pedir uno nuevo o al agotar intentos)
+  async invalidarPendientes(usuario_id, tipo) {
+    datos(await codigos().update({ usado: true }).eq('usuario_id', usuario_id).eq('tipo', tipo).eq('usado', false));
+  },
 };

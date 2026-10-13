@@ -1,73 +1,15 @@
 import { supabase } from '../config/supabase.js';
+import { datos } from '../utils/helpers.js';
+
+// Consultas genéricas de las tablas de catálogo
+const listar = async (tabla, orden) => datos(await supabase.from(tabla).select('*').order(orden, { ascending: true }));
+const buscar = async (tabla, id) => datos(await supabase.from(tabla).select('*').eq('id', id).maybeSingle());
 
 export const catalogoModel = {
-
-  //ROLES
-
-  async listarRoles() {
-    const { data, error } = await supabase
-      .from('roles')
-      .select('*')
-      .order('id', { ascending: true });
-
-    if (error) throw error;
-    return data;
-  },
-
-  async buscarRolPorId(id) {
-    const { data, error } = await supabase
-      .from('roles')
-      .select('*')
-      .eq('id', id)
-      .maybeSingle();
-
-    if (error) throw error;
-    return data;
-  },
-
-  //DEPORTES
-
-  async listarDeportes() {
-    const { data, error } = await supabase
-      .from('deportes')
-      .select('*')
-      .order('nombre', { ascending: true });
-
-    if (error) throw error;
-    return data;
-  },
-
-  async buscarDeportePorId(id) {
-    const { data, error } = await supabase
-      .from('deportes')
-      .select('*')
-      .eq('id', id)
-      .maybeSingle();
-
-    if (error) throw error;
-    return data;
-  },
-
-  //FORMATOS
-
-  async listarFormatos() {
-    const { data, error } = await supabase
-      .from('formatos')
-      .select('*')
-      .order('nombre', { ascending: true });
-
-    if (error) throw error;
-    return data;
-  },
-
-  async buscarFormatoPorId(id) {
-    const { data, error } = await supabase
-      .from('formatos')
-      .select('*')
-      .eq('id', id)
-      .maybeSingle();
-
-    if (error) throw error;
-    return data;
-  }
+  listarRoles: () => listar('roles', 'id'),
+  buscarRolPorId: (id) => buscar('roles', id),
+  listarDeportes: () => listar('deportes', 'nombre'),
+  buscarDeportePorId: (id) => buscar('deportes', id),
+  listarFormatos: () => listar('formatos', 'nombre'),
+  buscarFormatoPorId: (id) => buscar('formatos', id),
 };

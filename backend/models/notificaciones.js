@@ -1,28 +1,21 @@
 import { supabase } from '../config/supabase.js';
+import { datos } from '../utils/helpers.js';
+
+const notificaciones = () => supabase.from('notificaciones');
 
 export const notificacionModel = {
   async crear(notificacion) {
-    const { data, error } = await supabase.from('notificaciones').insert(notificacion).select().single();
-    if (error) throw error;
-    return data;
-  },
-  async crearVarias(notificaciones) {
-    const { data, error } = await supabase.from('notificaciones').insert(notificaciones).select();
-    if (error) throw error;
-    return data;
+    return datos(await notificaciones().insert(notificacion).select().single());
   },
   async listarPorUsuario(usuario_id) {
-    const { data, error } = await supabase
-      .from('notificaciones')
-      .select('*')
-      .eq('usuario_id', usuario_id)
-      .order('creado_en', { ascending: false });
-    if (error) throw error;
-    return data;
+    return datos(await notificaciones().select('*').eq('usuario_id', usuario_id).order('creado_en', { ascending: false }));
   },
-  async marcarLeida(id) {
-    const { data, error } = await supabase.from('notificaciones').update({ leida: true }).eq('id', id).select().single();
-    if (error) throw error;
-    return data;
-  }
+  // Solo si la notificación es del usuario
+  async marcarLeida(id, usuario_id) {
+    return datos(await notificaciones().update({ leida: true }).eq('id', id).eq('usuario_id', usuario_id).select().maybeSingle());
+  },
 };
+
+// Las notificaciones son accesorias: si fallan no deben romper la acción principal
+export const notificar = (usuario_id, titulo) =>
+  notificacionModel.crear({ usuario_id, titulo }).catch((e) => console.error('No se pudo crear la notificación:', e.message));

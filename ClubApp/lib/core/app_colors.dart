@@ -4,6 +4,7 @@ class AppColors {
   // Colores Primarios
   static const Color primary = Color(0xFF1E3A8A); // Dark Navy
   static const Color primaryLight = Color(0xFF3B82F6); // Light Blue
+  static const Color blue = Color(0xFF1D4ED8); // Azul intenso 
   
   // Colores secundarios
   static const Color secondary = Color(0xFF06B6D4); // Cyan
@@ -23,7 +24,8 @@ class AppColors {
   static const Color success = Color(0xFF10B981);
   static const Color error = Color(0xFFEF4444);
   static const Color warning = Color(0xFFFBBF24);
+  static const Color orange = Color(0xFFF59E0B);
   
   // Live indicator
-  static const Color live = Color(0xFF10B981);
+  static const Color live = success;
 }

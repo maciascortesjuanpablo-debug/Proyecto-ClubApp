@@ -1,15 +1,15 @@
 import * as brevo from '@getbrevo/brevo';
-import dotenv from 'dotenv';
-dotenv.config();
+import crypto from 'crypto';
+import { esc } from './helpers.js';
 
 const apiInstance = new brevo.TransactionalEmailsApi();
 apiInstance.setApiKey(brevo.TransactionalEmailsApiApiKeys.apiKey, process.env.BREVO_API_KEY);
 
-const LOGO_URL = 'https://res.cloudinary.com/xkwp03du/image/upload/v1791131589/logo1.png';
+const LOGO_URL = process.env.LOGO_URL ?? 'https://res.cloudinary.com/xkwp03du/image/upload/v1791131589/logo1.png';
+const REMITENTE = { name: process.env.BREVO_SENDER_NAME ?? process.env.EMAIL_FROM_NAME ?? 'ClubApp', email: process.env.BREVO_SENDER_EMAIL };
+export const CODIGO_MINUTOS = 10;
 
-export const generarCodigo = () => {
-  return Math.floor(100000 + Math.random() * 900000).toString();
-};
+export const generarCodigo = () => crypto.randomInt(100000, 1000000).toString();
 
 // Plantilla base con la identidad visual de ClubApp
 const plantillaBase = (contenido) => `
@@ -36,7 +36,7 @@ const plantillaBase = (contenido) => `
 
 export const enviarCorreoCodigo = async (correoDestino, nombre, codigo) => {
   const contenido = `
-    <h2 style="margin: 0 0 8px; font-size: 18px; color: white;">Hola ${nombre} 👋</h2>
+    <h2 style="margin: 0 0 8px; font-size: 18px; color: white;">Hola ${esc(nombre)} 👋</h2>
     <p style="color: #9ca3af; font-size: 14px; margin: 0 0 24px;">Recibimos una solicitud para recuperar tu contraseña. Usa este código para continuar:</p>
 
     <div style="background-color: #0b1120; border: 1px solid #1f2937; border-radius: 12px; padding: 20px; text-align: center; margin-bottom: 20px;">
@@ -44,7 +44,7 @@ export const enviarCorreoCodigo = async (correoDestino, nombre, codigo) => {
     </div>
 
     <div style="background-color: rgba(34, 211, 238, 0.08); border-radius: 8px; padding: 12px 16px;">
-      <p style="color: #67e8f9; font-size: 13px; margin: 0;">⏱️ Este código expira en <strong>2 minutos</strong> por tu seguridad.</p>
+      <p style="color: #67e8f9; font-size: 13px; margin: 0;">⏱️ Este código expira en <strong>${CODIGO_MINUTOS} minutos</strong> por tu seguridad.</p>
     </div>
 
     <p style="color: #6b7280; font-size: 12px; margin-top: 24px;">Si tú no solicitaste este código, puedes ignorar este correo con tranquilidad.</p>
@@ -53,7 +53,7 @@ export const enviarCorreoCodigo = async (correoDestino, nombre, codigo) => {
   const email = new brevo.SendSmtpEmail();
   email.subject = '🔐 Tu código de verificación - ClubApp';
   email.htmlContent = plantillaBase(contenido);
-  email.sender = { name: process.env.BREVO_SENDER_NAME, email: process.env.BREVO_SENDER_EMAIL };
+  email.sender = REMITENTE;
   email.to = [{ email: correoDestino, name: nombre }];
 
   await apiInstance.sendTransacEmail(email);
@@ -64,7 +64,7 @@ export const enviarCorreoConfirmacionCambio = async (correoDestino, nombre) => {
     <div style="text-align: center; margin-bottom: 20px;">
       <div style="width: 56px; height: 56px; background: rgba(34, 197, 94, 0.15); border-radius: 50%; margin: 0 auto 16px; display: flex; align-items: center; justify-content: center; font-size: 28px;">✅</div>
       <h2 style="margin: 0 0 8px; font-size: 18px; color: white;">¡Contraseña actualizada!</h2>
-      <p style="color: #9ca3af; font-size: 14px; margin: 0;">Hola ${nombre}, tu contraseña se cambió exitosamente.</p>
+      <p style="color: #9ca3af; font-size: 14px; margin: 0;">Hola ${esc(nombre)}, tu contraseña se cambió exitosamente.</p>
     </div>
 
     <div style="background-color: rgba(239, 68, 68, 0.08); border-left: 3px solid #ef4444; border-radius: 8px; padding: 14px 16px; margin-top: 20px;">
@@ -75,7 +75,7 @@ export const enviarCorreoConfirmacionCambio = async (correoDestino, nombre) => {
   const email = new brevo.SendSmtpEmail();
   email.subject = '✅ Tu contraseña fue actualizada - ClubApp';
   email.htmlContent = plantillaBase(contenido);
-  email.sender = { name: process.env.BREVO_SENDER_NAME, email: process.env.BREVO_SENDER_EMAIL };
+  email.sender = REMITENTE;
   email.to = [{ email: correoDestino, name: nombre }];
 
   await apiInstance.sendTransacEmail(email);

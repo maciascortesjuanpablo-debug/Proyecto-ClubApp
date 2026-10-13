@@ -1,5 +1,11 @@
 import 'package:flutter/material.dart';
 
+class AppConfig {
+  /// Dirección del backend. En el emulador de Android, 10.0.2.2 es el localhost de tu PC.
+  /// Para otro entorno: flutter run --dart-define=API_URL=https://tu-servidor.com/api
+  static const String apiUrl = String.fromEnvironment('API_URL', defaultValue: 'http://10.0.2.2:3000/api');
+}
+
 class AppSpacing {
   // Padding
   static const double paddingXSmall = 4;

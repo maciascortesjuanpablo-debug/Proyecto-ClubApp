@@ -1,142 +1,54 @@
 import { supabase } from '../config/supabase.js';
+import { datos } from '../utils/helpers.js';
+
+const equipos = () => supabase.from('equipos');
+const jugadores = () => supabase.from('equipo_jugadores');
+const staff = () => supabase.from('equipo_staff');
 
 export const equipoModel = {
-
   async crear(equipo) {
-    const { data, error } = await supabase
-      .from('equipos')
-      .insert(equipo)
-      .select()
-      .single();
-
-    if (error) throw error;
-    return data;
+    return datos(await equipos().insert(equipo).select().single());
   },
-
   async listarTodos() {
-    const { data, error } = await supabase
-      .from('equipos')
-      .select('*')
-      .order('creado_en', { ascending: false });
-
-    if (error) throw error;
-    return data;
+    return datos(await equipos().select('*').order('creado_en', { ascending: false }));
   },
-
   async buscarPorId(id) {
-    const { data, error } = await supabase
-      .from('equipos')
-      .select('*')
-      .eq('id', id)
-      .maybeSingle();
-
-    if (error) throw error;
-    return data;
+    return datos(await equipos().select('*').eq('id', id).maybeSingle());
   },
-
   async actualizar(id, cambios) {
-    const { data, error } = await supabase
-      .from('equipos')
-      .update(cambios)
-      .eq('id', id)
-      .select()
-      .single();
-
-    if (error) throw error;
-    return data;
+    return datos(await equipos().update(cambios).eq('id', id).select().single());
   },
-
   async eliminar(id) {
-    const { error } = await supabase
-      .from('equipos')
-      .delete()
-      .eq('id', id);
-
-    if (error) throw error;
+    datos(await equipos().delete().eq('id', id));
   },
 
   // ---- JUGADORES DEL EQUIPO ----
-
-  async agregarJugador(datos) {
-    const { data, error } = await supabase
-      .from('equipo_jugadores')
-      .insert(datos)
-      .select()
-      .single();
-
-    if (error) throw error;
-    return data;
+  async agregarJugador(jugador) {
+    return datos(await jugadores().insert(jugador).select().single());
   },
-
+  async buscarJugador(equipo_id, usuario_id) {
+    return datos(await jugadores().select('id').eq('equipo_id', equipo_id).eq('usuario_id', usuario_id).maybeSingle());
+  },
   async listarJugadores(equipo_id) {
-    const { data, error } = await supabase
-      .from('equipo_jugadores')
-      .select(`
-        id, posicion, dorsal, estado_convocatoria, es_titular, creado_en,
-        usuarios ( id, nombre, apellido, correo )
-      `)
-      .eq('equipo_id', equipo_id);
-
-    if (error) throw error;
-    return data;
+    return datos(await jugadores()
+      .select('id, posicion, dorsal, estado_convocatoria, es_titular, creado_en, usuarios ( id, nombre, apellido )')
+      .eq('equipo_id', equipo_id));
   },
-
   async actualizarJugador(equipo_id, usuario_id, cambios) {
-    const { data, error } = await supabase
-      .from('equipo_jugadores')
-      .update(cambios)
-      .eq('equipo_id', equipo_id)
-      .eq('usuario_id', usuario_id)
-      .select()
-      .single();
-
-    if (error) throw error;
-    return data;
+    return datos(await jugadores().update(cambios).eq('equipo_id', equipo_id).eq('usuario_id', usuario_id).select().single());
   },
-
   async eliminarJugador(equipo_id, usuario_id) {
-    const { error } = await supabase
-      .from('equipo_jugadores')
-      .delete()
-      .eq('equipo_id', equipo_id)
-      .eq('usuario_id', usuario_id);
-
-    if (error) throw error;
+    datos(await jugadores().delete().eq('equipo_id', equipo_id).eq('usuario_id', usuario_id));
   },
 
   // ---- STAFF DEL EQUIPO ----
-
-  async agregarStaff(datos) {
-    const { data, error } = await supabase
-      .from('equipo_staff')
-      .insert(datos)
-      .select()
-      .single();
-
-    if (error) throw error;
-    return data;
+  async agregarStaff(miembro) {
+    return datos(await staff().insert(miembro).select().single());
   },
-
   async listarStaff(equipo_id) {
-    const { data, error } = await supabase
-      .from('equipo_staff')
-      .select(`
-        id, cargo, creado_en,
-        usuarios ( id, nombre, apellido, correo )
-      `)
-      .eq('equipo_id', equipo_id);
-
-    if (error) throw error;
-    return data;
+    return datos(await staff().select('id, cargo, creado_en, usuarios ( id, nombre, apellido )').eq('equipo_id', equipo_id));
   },
-
   async eliminarStaff(equipo_id, usuario_id) {
-    const { error } = await supabase
-      .from('equipo_staff')
-      .delete()
-      .eq('equipo_id', equipo_id)
-      .eq('usuario_id', usuario_id);
-
-    if (error) throw error;
-  }
+    datos(await staff().delete().eq('equipo_id', equipo_id).eq('usuario_id', usuario_id));
+  },
 };

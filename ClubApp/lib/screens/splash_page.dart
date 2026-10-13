@@ -1,52 +1,37 @@
 import 'package:flutter/material.dart';
 import '../core/app_colors.dart';
-import '../screens/login_page.dart';
+import '../core/app_constants.dart';
+import '../services/auth_service.dart';
+import 'login_page.dart';
+import 'main_shell.dart';
 
 class SplashScreen extends StatefulWidget {
-  const SplashScreen({Key? key}) : super(key: key);
+  const SplashScreen({super.key});
 
   @override
   State<SplashScreen> createState() => _SplashScreenState();
 }
 
-class _SplashScreenState extends State<SplashScreen>
-    with SingleTickerProviderStateMixin {
-  late final AnimationController _controller;
-  late final Animation<double> _fadeAnimation;
-  late final Animation<double> _scaleAnimation;
+class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderStateMixin {
+  late final AnimationController _controller =
+      AnimationController(vsync: this, duration: const Duration(milliseconds: 900))..forward();
+  late final Animation<double> _fade = CurvedAnimation(parent: _controller, curve: Curves.easeIn);
+  late final Animation<double> _scale =
+      Tween<double>(begin: 0.85, end: 1.0).animate(CurvedAnimation(parent: _controller, curve: Curves.easeOutBack));
 
   @override
   void initState() {
     super.initState();
-
-    _controller = AnimationController(
-      vsync: this,
-      duration: const Duration(milliseconds: 900),
-    );
-
-    _fadeAnimation = CurvedAnimation(
-      parent: _controller,
-      curve: Curves.easeIn,
-    );
-
-    _scaleAnimation = Tween<double>(begin: 0.85, end: 1.0).animate(
-      CurvedAnimation(parent: _controller, curve: Curves.easeOutBack),
-    );
-
-    _controller.forward();
-
     _goNext();
   }
 
+  /// Restaura la sesión mientras se muestra el splash: con sesión va al inicio, si no, al login
   Future<void> _goNext() async {
-    // Tiempo total mostrando el splash antes de navegar
-    await Future.delayed(const Duration(seconds: 4));
-
+    await Future.wait([AuthService.cargarSesion(), Future.delayed(AppDurations.splashDuration)]);
     if (!mounted) return;
-
     Navigator.pushReplacement(
       context,
-      MaterialPageRoute(builder: (context) => const LoginPage()),
+      MaterialPageRoute(builder: (_) => AuthService.isLoggedIn ? const MainShell() : const LoginPage()),
     );
   }
 
@@ -62,13 +47,13 @@ class _SplashScreenState extends State<SplashScreen>
       backgroundColor: AppColors.bgDark,
       body: Center(
         child: FadeTransition(
-          opacity: _fadeAnimation,
+          opacity: _fade,
           child: ScaleTransition(
-            scale: _scaleAnimation,
+            scale: _scale,
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                Container(
+                SizedBox(
                   width: 120,
                   height: 120,
                   child: ClipRRect(
@@ -76,47 +61,20 @@ class _SplashScreenState extends State<SplashScreen>
                     child: Image.asset(
                       'assets/images/logo1.png',
                       fit: BoxFit.contain,
-                      errorBuilder: (context, error, stackTrace) {
-                        return const Center(
-                          child: Text(
-                            'c',
-                            style: TextStyle(
-                              color: AppColors.textWhite,
-                              fontSize: 40,
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
-                        );
-                      },
+                      errorBuilder: (_, __, ___) => const Center(
+                        child: Text('c', style: TextStyle(color: AppColors.textWhite, fontSize: 40, fontWeight: FontWeight.bold)),
+                      ),
                     ),
                   ),
                 ),
-                const Text(
-                  'ClubApp',
-                  style: TextStyle(
-                    fontSize: 35,
-                    fontWeight: FontWeight.bold,
-                    color: AppColors.textWhite,
-                  ),
-                ),
+                const Text('ClubApp', style: TextStyle(fontSize: 35, fontWeight: FontWeight.bold, color: AppColors.textWhite)),
                 const SizedBox(height: 6),
-                const Text(
-                  'Plataforma deportiva integral',
-                  style: TextStyle(
-                    fontSize: 25,
-                    color: AppColors.textGray,
-                  ),
-                ),
+                const Text('Plataforma deportiva integral', style: TextStyle(fontSize: 25, color: AppColors.textGray)),
                 const SizedBox(height: 40),
-                SizedBox(
+                const SizedBox(
                   width: 32,
                   height: 32,
-                  child: CircularProgressIndicator(
-                    strokeWidth: 3,
-                    valueColor: AlwaysStoppedAnimation<Color>(
-                      AppColors.primaryLight,
-                    ),
-                  ),
+                  child: CircularProgressIndicator(strokeWidth: 3, valueColor: AlwaysStoppedAnimation<Color>(AppColors.primaryLight)),
                 ),
               ],
             ),

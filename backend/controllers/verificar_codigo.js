@@ -1,82 +1,79 @@
 import bcrypt from 'bcrypt';
+import crypto from 'crypto';
 import jwt from 'jsonwebtoken';
 import { usuarioModel } from '../models/usuario.js';
 import { codigoVerificacionModel } from '../models/verificar_codigo.js';
-import { enviarCorreoCodigo, enviarCorreoConfirmacionCambio, generarCodigo } from '../utils/sendEmail.js';
+import { enviarCorreoCodigo, enviarCorreoConfirmacionCambio, generarCodigo, CODIGO_MINUTOS } from '../utils/sendEmail.js';
+import { firmarReset, huella } from '../utils/token.js';
+import { MSG_PASSWORD, fallo, normalizarCorreo, passwordValida } from '../utils/helpers.js';
+
+const TIPO = 'recuperar_password';
+const MAX_INTENTOS = 5;
+// Intentos fallidos por usuario (en memoria: se reinicia con el servidor)
+const intentos = new Map();
 
 // PASO 1: enviar código al correo
 export const enviarCodigo = async (req, res) => {
   try {
-    const { correo } = req.body;
-
-    if (!correo) {
-      return res.status(400).json({ mensaje: 'El correo es obligatorio' });
-    }
+    const correo = normalizarCorreo(req.body.correo);
+    if (!correo) return res.status(400).json({ mensaje: 'El correo es obligatorio' });
 
     const usuario = await usuarioModel.buscarPorCorreo(correo);
-    if (!usuario) {
-      return res.json({ mensaje: 'Si el correo existe, se envió un código' });
-    }
+    // Misma respuesta exista o no el correo (no revela qué cuentas hay)
+    if (!usuario || !usuario.activo) return res.json({ mensaje: 'Si el correo existe, se envió un código' });
+
+    await codigoVerificacionModel.invalidarPendientes(usuario.id, TIPO);
+    intentos.delete(usuario.id);
 
     const codigo = generarCodigo();
-
     await codigoVerificacionModel.crear({
-      usuario_id: usuario.id,
-      codigo,
-      tipo: 'recuperar_password',
-      expira_en: new Date(Date.now() + 2 * 60 * 1000)
+      usuario_id: usuario.id, codigo, tipo: TIPO,
+      expira_en: new Date(Date.now() + CODIGO_MINUTOS * 60 * 1000),
     });
-
     await enviarCorreoCodigo(usuario.correo, usuario.nombre, codigo);
 
-    res.json({ mensaje: 'Código enviado a tu correo' });
-
+    res.json({ mensaje: 'Si el correo existe, se envió un código' });
   } catch (error) {
-    console.error(error);
-    res.status(500).json({ mensaje: 'Error al enviar el código', error: error.message });
+    fallo(res, error, 'Error al enviar el código');
   }
 };
 
 // PASO 2: verificar el código de 6 dígitos
 export const verificarCodigo = async (req, res) => {
   try {
-    const { correo, codigo } = req.body;
+    const correo = normalizarCorreo(req.body.correo);
+    const codigo = String(req.body.codigo ?? '').trim();
 
-    if (!correo || !codigo) {
-      return res.status(400).json({ mensaje: 'Correo y código son obligatorios' });
-    }
+    if (!correo || !codigo) return res.status(400).json({ mensaje: 'Correo y código son obligatorios' });
+
+    const invalido = () => res.status(400).json({ mensaje: 'Código incorrecto o expirado' });
+    if (!/^\d{6}$/.test(codigo)) return invalido();
 
     const usuario = await usuarioModel.buscarPorCorreo(correo);
-    if (!usuario) {
-      return res.status(404).json({ mensaje: 'Usuario no encontrado' });
+    if (!usuario || !usuario.activo) return invalido();
+
+    if ((intentos.get(usuario.id) ?? 0) >= MAX_INTENTOS) {
+      await codigoVerificacionModel.invalidarPendientes(usuario.id, TIPO);
+      return res.status(429).json({ mensaje: 'Demasiados intentos, solicita un código nuevo' });
     }
 
-    const codigoValido = await codigoVerificacionModel.buscarValido({
-      usuario_id: usuario.id,
-      codigo
-    });
-
+    const codigoValido = await codigoVerificacionModel.buscarValido({ usuario_id: usuario.id, codigo });
     if (!codigoValido) {
-      return res.status(400).json({ mensaje: 'Código incorrecto o expirado' });
+      intentos.set(usuario.id, (intentos.get(usuario.id) ?? 0) + 1);
+      return invalido();
     }
 
+    intentos.delete(usuario.id);
     await codigoVerificacionModel.marcarUsado(codigoValido.id);
 
-    const tokenTemporal = jwt.sign(
-      { id: usuario.id, proposito: 'cambiar_password' },
-      process.env.JWT_SECRET,
-      { expiresIn: '10m' }
-    );
-
-    res.json({ mensaje: 'Código verificado', tokenTemporal });
-
+    const { password_hash } = await usuarioModel.buscarConHash(usuario.id);
+    res.json({ mensaje: 'Código verificado', tokenTemporal: firmarReset(usuario, password_hash) });
   } catch (error) {
-    console.error(error);
-    res.status(500).json({ mensaje: 'Error al verificar el código', error: error.message });
+    fallo(res, error, 'Error al verificar el código');
   }
 };
 
-// PASO 3: cambiar la contraseña
+// PASO 3: cambiar la contraseña (el token temporal vale una sola vez)
 export const cambiarPassword = async (req, res) => {
   try {
     const { tokenTemporal, nuevaPassword } = req.body;
@@ -84,10 +81,7 @@ export const cambiarPassword = async (req, res) => {
     if (!tokenTemporal || !nuevaPassword) {
       return res.status(400).json({ mensaje: 'Token y nueva contraseña son obligatorios' });
     }
-
-    if (nuevaPassword.length < 8) {
-      return res.status(400).json({ mensaje: 'La contraseña debe tener mínimo 8 caracteres' });
-    }
+    if (!passwordValida(nuevaPassword)) return res.status(400).json({ mensaje: MSG_PASSWORD });
 
     let payload;
     try {
@@ -95,21 +89,22 @@ export const cambiarPassword = async (req, res) => {
     } catch {
       return res.status(401).json({ mensaje: 'Token inválido o expirado, solicita un nuevo código' });
     }
-
     if (payload.proposito !== 'cambiar_password') {
       return res.status(401).json({ mensaje: 'Token no autorizado para esta acción' });
     }
 
-    const passwordHash = await bcrypt.hash(nuevaPassword, 10);
-    await usuarioModel.actualizarPassword(payload.id, passwordHash);
+    const usuario = await usuarioModel.buscarConHash(payload.id);
+    const huellaActual = Buffer.from(huella(usuario?.password_hash));
+    const huellaToken = Buffer.from(String(payload.ph ?? ''));
+    if (!usuario || huellaActual.length !== huellaToken.length || !crypto.timingSafeEqual(huellaActual, huellaToken)) {
+      return res.status(401).json({ mensaje: 'Este enlace ya fue utilizado, solicita un nuevo código' });
+    }
 
-    const usuario = await usuarioModel.buscarPorId(payload.id);
-    await enviarCorreoConfirmacionCambio(usuario.correo, usuario.nombre);
+    await usuarioModel.actualizarPassword(usuario.id, await bcrypt.hash(nuevaPassword, 10));
+    await enviarCorreoConfirmacionCambio(usuario.correo, usuario.nombre).catch((e) => console.error('Correo de confirmación:', e.message));
 
     res.json({ mensaje: 'Contraseña actualizada exitosamente' });
-
   } catch (error) {
-    console.error(error);
-    res.status(500).json({ mensaje: 'Error al cambiar la contraseña', error: error.message });
+    fallo(res, error, 'Error al cambiar la contraseña');
   }
 };

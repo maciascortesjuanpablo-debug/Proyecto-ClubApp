@@ -1,54 +1,42 @@
 import { usuarioModel } from '../models/usuario.js';
+import { fallo, pick } from '../utils/helpers.js';
+
+const EDITABLES = ['nombre', 'apellido', 'numero_celular', 'fecha_nacimiento', 'ciudad', 'nivel_juego'];
 
 export const obtenerUsuarios = async (req, res) => {
   try {
-    const usuarios = await usuarioModel.listarTodos();
-    res.json(usuarios);
+    res.json(await usuarioModel.listarTodos());
   } catch (error) {
-    console.error(error);
-    res.status(500).json({ mensaje: 'Error al obtener usuarios', error: error.message });
+    fallo(res, error, 'Error al obtener usuarios');
   }
 };
 
 export const obtenerUsuarioPorId = async (req, res) => {
   try {
-    const { id } = req.params;
-    const usuario = await usuarioModel.buscarPorId(id);
-
-    if (!usuario) {
-      return res.status(404).json({ mensaje: 'Usuario no encontrado' });
-    }
-
+    const usuario = await usuarioModel.buscarPorId(req.params.id);
+    if (!usuario) return res.status(404).json({ mensaje: 'Usuario no encontrado' });
     res.json(usuario);
   } catch (error) {
-    console.error(error);
-    res.status(500).json({ mensaje: 'Error al obtener el usuario', error: error.message });
+    fallo(res, error, 'Error al obtener el usuario');
   }
 };
 
 export const actualizarUsuario = async (req, res) => {
   try {
-    const { id } = req.params;
+    const cambios = pick(req.body, EDITABLES); // lista blanca: rol, correo, verificación, etc. no se tocan aquí
+    if (!Object.keys(cambios).length) return res.status(400).json({ mensaje: 'No hay campos válidos para actualizar' });
 
-    // Bloqueamos campos sensibles que no deben cambiarse por esta ruta
-    const { password, password_hash, rol_id, correo_verificado, activo, correo, ...datosPermitidos } = req.body;
-
-    const usuarioActualizado = await usuarioModel.actualizarUsuario(id, datosPermitidos);
-    res.json({ mensaje: 'Usuario actualizado', usuario: usuarioActualizado });
-
+    res.json({ mensaje: 'Usuario actualizado', usuario: await usuarioModel.actualizarUsuario(req.params.id, cambios) });
   } catch (error) {
-    console.error(error);
-    res.status(500).json({ mensaje: 'Error al actualizar el usuario', error: error.message });
+    fallo(res, error, 'Error al actualizar el usuario');
   }
 };
 
 export const eliminarUsuario = async (req, res) => {
   try {
-    const { id } = req.params;
-    await usuarioModel.eliminar(id);
+    await usuarioModel.eliminar(req.params.id);
     res.json({ mensaje: 'Usuario desactivado exitosamente' });
   } catch (error) {
-    console.error(error);
-    res.status(500).json({ mensaje: 'Error al eliminar el usuario', error: error.message });
+    fallo(res, error, 'Error al eliminar el usuario');
   }
 };

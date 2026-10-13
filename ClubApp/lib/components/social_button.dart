@@ -8,12 +8,12 @@ class SocialButton extends StatelessWidget {
   final bool isExpanded;
 
   const SocialButton({
-    Key? key,
+    super.key,
     required this.icon,
     required this.label,
     required this.onPressed,
     this.isExpanded = true,
-  }) : super(key: key);
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -28,7 +28,7 @@ class SocialButton extends StatelessWidget {
       ),
       label: Text(label),
       style: ElevatedButton.styleFrom(
-        backgroundColor: AppColors.primary.withOpacity(0.8),
+        backgroundColor: AppColors.primary.withValues(alpha: 0.8),
         foregroundColor: AppColors.textWhite,
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(12),

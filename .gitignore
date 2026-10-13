@@ -1,0 +1,13 @@
+# Dependencias y compilados
+node_modules/
+build/
+.dart_tool/
+.gradle/
+
+# Secretos y configuración local
+.env
+local.properties
+
+# IDE
+.idea/
+*.iml

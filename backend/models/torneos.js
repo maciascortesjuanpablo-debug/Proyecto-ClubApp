@@ -1,102 +1,36 @@
 import { supabase } from '../config/supabase.js';
+import { datos } from '../utils/helpers.js';
+
+const torneos = () => supabase.from('torneos');
+const RELACIONES = 'deportes ( id, nombre ), formatos ( id, nombre ), usuarios ( id, nombre, apellido )';
 
 export const torneoModel = {
-
   async crear(torneo) {
-    const { data, error } = await supabase
-      .from('torneos')
-      .insert(torneo)
-      .select()
-      .single();
-
-    if (error) throw error;
-    return data;
+    return datos(await torneos().insert(torneo).select().single());
   },
-
   async listarTodos() {
-    const { data, error } = await supabase
-      .from('torneos')
-      .select(`
-        id, nombre, max_equipos, estado, jornada_actual, jornada_total, ciudad, creado_en,
-        deportes ( id, nombre ),
-        formatos ( id, nombre ),
-        usuarios ( id, nombre, apellido )
-      `)
-      .order('creado_en', { ascending: false });
-
-    if (error) throw error;
-    return data;
+    return datos(await torneos()
+      .select(`id, nombre, max_equipos, estado, jornada_actual, jornada_total, ciudad, creado_en, ${RELACIONES}`)
+      .order('creado_en', { ascending: false }));
   },
-
   async buscarPorId(id) {
-    const { data, error } = await supabase
-      .from('torneos')
-      .select(`
-        *,
-        deportes ( id, nombre ),
-        formatos ( id, nombre ),
-        usuarios ( id, nombre, apellido )
-      `)
-      .eq('id', id)
-      .maybeSingle();
-
-    if (error) throw error;
-    return data;
+    return datos(await torneos().select(`*, ${RELACIONES}`).eq('id', id).maybeSingle());
   },
-
   async listarPorOrganizador(organizador_id) {
-    const { data, error } = await supabase
-      .from('torneos')
-      .select('*')
-      .eq('organizador_id', organizador_id)
-      .order('creado_en', { ascending: false });
-
-    if (error) throw error;
-    return data;
+    return datos(await torneos().select('*').eq('organizador_id', organizador_id).order('creado_en', { ascending: false }));
   },
-
   async actualizar(id, cambios) {
-    const { data, error } = await supabase
-      .from('torneos')
-      .update(cambios)
-      .eq('id', id)
-      .select()
-      .single();
-
-    if (error) throw error;
-    return data;
+    return datos(await torneos().update(cambios).eq('id', id).select().single());
   },
-
   async eliminar(id) {
-    const { error } = await supabase
-      .from('torneos')
-      .delete()
-      .eq('id', id);
-
-    if (error) throw error;
+    datos(await torneos().delete().eq('id', id));
   },
 
   // ---- GRUPOS DEL TORNEO ----
-
   async crearGrupo({ torneo_id, nombre }) {
-    const { data, error } = await supabase
-      .from('grupos_torneo')
-      .insert({ torneo_id, nombre })
-      .select()
-      .single();
-
-    if (error) throw error;
-    return data;
+    return datos(await supabase.from('grupos_torneo').insert({ torneo_id, nombre }).select().single());
   },
-
   async listarGruposPorTorneo(torneo_id) {
-    const { data, error } = await supabase
-      .from('grupos_torneo')
-      .select('*')
-      .eq('torneo_id', torneo_id)
-      .order('nombre');
-
-    if (error) throw error;
-    return data;
-  }
+    return datos(await supabase.from('grupos_torneo').select('*').eq('torneo_id', torneo_id).order('nombre'));
+  },
 };

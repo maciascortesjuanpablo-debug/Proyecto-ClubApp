@@ -1,68 +1,45 @@
 import { supabase } from '../config/supabase.js';
+import { datos } from '../utils/helpers.js';
+
+const eventos = () => supabase.from('eventos_calendario');
+const SELECT_EVENTO = `*, sedes_canchas(id, nombre, direccion, ciudad),
+  equipo_local:equipo_local_id(id, nombre, logo_url),
+  equipo_visitante:equipo_visitante_id(id, nombre, logo_url)`;
 
 export const calendarioModel = {
   // SEDES
   async crearSede(sede) {
-    const { data, error } = await supabase.from('sedes_canchas').insert(sede).select().single();
-    if (error) throw error;
-    return data;
+    return datos(await supabase.from('sedes_canchas').insert(sede).select().single());
   },
   async listarSedes() {
-    const { data, error } = await supabase.from('sedes_canchas').select('*').order('nombre');
-    if (error) throw error;
-    return data;
+    return datos(await supabase.from('sedes_canchas').select('*').order('nombre'));
   },
 
   // EVENTOS
   async crearEvento(evento) {
-    const { data, error } = await supabase.from('eventos_calendario').insert(evento).select().single();
-    if (error) throw error;
-    return data;
+    return datos(await eventos().insert(evento).select().single());
   },
   async listarPorTorneo(torneo_id) {
-    const { data, error } = await supabase
-      .from('eventos_calendario')
-      .select(`*, sedes_canchas(id, nombre, direccion, ciudad),
-                equipo_local:equipo_local_id(id, nombre, logo_url),
-                equipo_visitante:equipo_visitante_id(id, nombre, logo_url)`)
-      .eq('torneo_id', torneo_id)
-      .order('fecha', { ascending: true });
-    if (error) throw error;
-    return data;
+    return datos(await eventos().select(SELECT_EVENTO).eq('torneo_id', torneo_id).order('fecha', { ascending: true }));
   },
   async buscarPorId(id) {
-    const { data, error } = await supabase
-      .from('eventos_calendario')
-      .select(`*, sedes_canchas(id, nombre, direccion, ciudad),
-                equipo_local:equipo_local_id(id, nombre, logo_url),
-                equipo_visitante:equipo_visitante_id(id, nombre, logo_url)`)
-      .eq('id', id)
-      .maybeSingle();
-    if (error) throw error;
-    return data;
+    return datos(await eventos().select(SELECT_EVENTO).eq('id', id).maybeSingle());
   },
   async actualizar(id, cambios) {
-    const { data, error } = await supabase.from('eventos_calendario').update(cambios).eq('id', id).select().single();
-    if (error) throw error;
-    return data;
+    return datos(await eventos().update(cambios).eq('id', id).select().single());
   },
   async eliminar(id) {
-    const { error } = await supabase.from('eventos_calendario').delete().eq('id', id);
-    if (error) throw error;
+    datos(await eventos().delete().eq('id', id));
   },
 
   // ÁRBITROS
-  async asignarArbitro(datos) {
-    const { data, error } = await supabase.from('partido_arbitros').insert(datos).select().single();
-    if (error) throw error;
-    return data;
+  async asignarArbitro(arbitro) {
+    return datos(await supabase.from('partido_arbitros').insert(arbitro).select().single());
   },
   async listarArbitrosPorEvento(evento_id) {
-    const { data, error } = await supabase
-      .from('partido_arbitros')
-      .select('id, rol_arbitraje, usuarios(id, nombre, apellido)')
-      .eq('evento_id', evento_id);
-    if (error) throw error;
-    return data;
-  }
+    return datos(await supabase.from('partido_arbitros').select('id, rol_arbitraje, usuarios(id, nombre, apellido)').eq('evento_id', evento_id));
+  },
+  async esArbitroDelEvento(evento_id, usuario_id) {
+    return !!datos(await supabase.from('partido_arbitros').select('id').eq('evento_id', evento_id).eq('usuario_id', usuario_id).limit(1).maybeSingle());
+  },
 };

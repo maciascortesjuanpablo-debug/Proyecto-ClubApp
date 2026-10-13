@@ -1,47 +1,16 @@
 import { supabase } from '../config/supabase.js';
+import { datos } from '../utils/helpers.js';
+
+const perfiles = () => supabase.from('perfil_jugador');
 
 export const perfilJugadorModel = {
-
   async crear(perfil) {
-    const { data, error } = await supabase
-      .from('perfil_jugador')
-      .insert(perfil)
-      .select()
-      .single();
-
-    if (error) throw error;
-    return data;
+    return datos(await perfiles().insert(perfil).select().single());
   },
-
   async buscarPorUsuarioId(usuario_id) {
-    const { data, error } = await supabase
-      .from('perfil_jugador')
-      .select('*')
-      .eq('usuario_id', usuario_id)
-      .maybeSingle();
-
-    if (error) throw error;
-    return data;
+    return datos(await perfiles().select('*').eq('usuario_id', usuario_id).maybeSingle());
   },
-
   async actualizar(usuario_id, cambios) {
-    const { data, error } = await supabase
-      .from('perfil_jugador')
-      .update(cambios)
-      .eq('usuario_id', usuario_id)
-      .select()
-      .single();
-
-    if (error) throw error;
-    return data;
+    return datos(await perfiles().update(cambios).eq('usuario_id', usuario_id).select().single());
   },
-
-  async eliminar(usuario_id) {
-    const { error } = await supabase
-      .from('perfil_jugador')
-      .delete()
-      .eq('usuario_id', usuario_id);
-
-    if (error) throw error;
-  }
 };

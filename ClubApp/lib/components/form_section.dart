@@ -8,12 +8,12 @@ class FormSection extends StatelessWidget {
   final EdgeInsets padding;
 
   const FormSection({
-    Key? key,
+    super.key,
     required this.title,
     required this.subtitle,
     required this.children,
     this.padding = const EdgeInsets.only(bottom: 20),
-  }) : super(key: key);
+  });
 
   @override
   Widget build(BuildContext context) {

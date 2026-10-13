@@ -9,13 +9,13 @@ class AppHeader extends StatelessWidget {
   final double logoSize;
 
   const AppHeader({
-    Key? key,
+    super.key,
     required this.title,
     required this.subtitle,
     this.showLogo = true,
     this.logoAssetPath,
     this.logoSize = 70,
-  }) : super(key: key);
+  });
 
   @override
   Widget build(BuildContext context) {

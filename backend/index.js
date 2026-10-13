@@ -1,8 +1,9 @@
+import 'dotenv/config'; // siempre primero: el resto de módulos lee process.env al cargarse
 import express from 'express';
 import cors from 'cors';
 import helmet from 'helmet';
-import dotenv from 'dotenv';
 import { conectaDB } from './config/supabase.js';
+import { limiteGeneral } from './middlewares/limites.js';
 
 import authRoutes from './routes/auth.js';
 import usuarioRoutes from './routes/usuario.js';
@@ -16,48 +17,50 @@ import calendarioRoutes from './routes/calendario.js';
 import estadisticasRoutes from './routes/estadisticas.js';
 import notificacionesRoutes from './routes/notificaciones.js';
 import favoritosRoutes from './routes/favoritos.js';
-import scoutAiRoutes from "./routes/scouthIA.js";
+import scoutIARoutes from './routes/scoutIA.js';
+import homeRoutes from './routes/home.js';
 
-dotenv.config();
 conectaDB();
 
 const app = express();
+// Detrás de un proxy (Render, Railway...) define TRUST_PROXY=1 para que el límite de peticiones use la IP real
+if (process.env.TRUST_PROXY) app.set('trust proxy', Number(process.env.TRUST_PROXY));
 app.use(helmet());
 app.use(cors());
-app.use(express.json());
+app.use(express.json({ limit: '100kb' }));
+app.use(limiteGeneral);
 
-//Ruta login
-app.use('/api/auth', authRoutes);
-//Ruta usuarios
-app.use('/api/usuarios', usuarioRoutes);
-//Ruta recuperar contraseña
-app.use('/api/recuperar-password', verificarCodigoRoutes);
-//Ruta catalogo
-app.use('/api/catalogo', catalogoRoutes);
-//Ruta perfil jugador
-app.use('/api/perfil-jugador', perfilJugadorRoutes);
-//Ruta torneos
-app.use('/api/torneos', torneosRoutes);
-app.use('/api/equipos', equiposRoutes);
-//Ruta equipos
-app.use('/api/inscripciones', inscripcionesRoutes);
-//Ruta calendario
-app.use('/api/calendario', calendarioRoutes);
-//Ruta estadisticas
-app.use('/api/estadisticas', estadisticasRoutes);
-//Rutas notificaciones
-app.use('/api/notificaciones', notificacionesRoutes);
-//Ruta favoritos
-app.use('/api/favoritos', favoritosRoutes);
-//Ruta Scout AI
-app.use("/api/scout", scoutAiRoutes);
+app.get('/api/salud', (req, res) => res.json({ ok: true }));
 
+const rutas = {
+  auth: authRoutes,
+  usuarios: usuarioRoutes,
+  'recuperar-password': verificarCodigoRoutes,
+  catalogo: catalogoRoutes,
+  'perfil-jugador': perfilJugadorRoutes,
+  torneos: torneosRoutes,
+  equipos: equiposRoutes,
+  inscripciones: inscripcionesRoutes,
+  calendario: calendarioRoutes,
+  estadisticas: estadisticasRoutes,
+  notificaciones: notificacionesRoutes,
+  favoritos: favoritosRoutes,
+  scout: scoutIARoutes,
+  home: homeRoutes,
+};
+for (const [ruta, router] of Object.entries(rutas)) app.use(`/api/${ruta}`, router);
 
-//Configuramos el puerto
-const port = process.env.PORT || 3000;
+app.use((req, res) => res.status(404).json({ mensaje: 'Ruta no encontrada' }));
 
-//Poner a escuchar el servidor
-app.listen(port, () => {
-    console.log(`✅Servidor escuchando el puerto ${port}`);
-    console.log(`http://localhost:${port}`);
+// Manejador global: nunca devuelve detalles internos
+// eslint-disable-next-line no-unused-vars
+app.use((err, req, res, next) => {
+  if (err.type === 'entity.parse.failed') return res.status(400).json({ mensaje: 'JSON inválido' });
+  if (err.type === 'entity.too.large') return res.status(413).json({ mensaje: 'La petición es demasiado grande' });
+  if (err.name === 'MulterError' || err.message?.startsWith('Solo se permiten')) return res.status(400).json({ mensaje: err.message });
+  console.error(err);
+  res.status(500).json({ mensaje: 'Error interno del servidor' });
 });
+
+const port = process.env.PORT || 3000;
+app.listen(port, () => console.log(`✅ Servidor escuchando en http://localhost:${port}`));

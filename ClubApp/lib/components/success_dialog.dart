@@ -8,12 +8,12 @@ class SuccessDialog extends StatelessWidget {
   final VoidCallback onButtonPressed;
 
   const SuccessDialog({
-    Key? key,
+    super.key,
     required this.title,
     required this.message,
     this.buttonText = 'Continuar',
     required this.onButtonPressed,
-  }) : super(key: key);
+  });
 
   static Future<void> show({
     required BuildContext context,
@@ -48,7 +48,7 @@ class SuccessDialog extends StatelessWidget {
               width: 64,
               height: 64,
               decoration: BoxDecoration(
-                color: AppColors.success.withOpacity(0.15),
+                color: AppColors.success.withValues(alpha: 0.15),
                 shape: BoxShape.circle,
               ),
               child: Icon(Icons.check_circle, color: AppColors.success, size: 36),

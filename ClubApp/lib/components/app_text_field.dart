@@ -15,7 +15,7 @@ class AppTextField extends StatefulWidget {
   final int maxLines;
 
   const AppTextField({
-    Key? key,
+    super.key,
     required this.label,
     required this.hint,
     required this.controller,
@@ -26,7 +26,7 @@ class AppTextField extends StatefulWidget {
     this.showVisibilityToggle = false,
     this.minLines = 1,
     this.maxLines = 1,
-  }) : super(key: key);
+  });
 
   @override
   State<AppTextField> createState() => _AppTextFieldState();

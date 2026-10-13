@@ -1,145 +1,67 @@
 import { supabase } from '../config/supabase.js';
+import { datos } from '../utils/helpers.js';
+
+const inscripciones = () => supabase.from('inscripciones_equipo');
+const tabla = () => supabase.from('tabla_posiciones');
+const invitaciones = () => supabase.from('invitaciones_equipo');
 
 export const inscripcionModel = {
-
   // ---- INSCRIPCIONES ----
-
   async inscribirEquipo({ torneo_id, equipo_id }) {
-    const { data, error } = await supabase
-      .from('inscripciones_equipo')
-      .insert({ torneo_id, equipo_id })
-      .select()
-      .single();
-
-    if (error) throw error;
-    return data;
+    return datos(await inscripciones().insert({ torneo_id, equipo_id }).select().single());
   },
-
+  async buscarPorTorneoYEquipo(torneo_id, equipo_id) {
+    return datos(await inscripciones().select('id').eq('torneo_id', torneo_id).eq('equipo_id', equipo_id).limit(1).maybeSingle());
+  },
+  async contarAceptadas(torneo_id) {
+    const { count, error } = await inscripciones().select('id', { count: 'exact', head: true }).eq('torneo_id', torneo_id).eq('estado', 'Aceptado');
+    if (error) throw error;
+    return count ?? 0;
+  },
+  async equiposAceptados(torneo_id) {
+    return datos(await inscripciones().select('equipo_id').eq('torneo_id', torneo_id).eq('estado', 'Aceptado')).map((i) => i.equipo_id);
+  },
   async listarPorTorneo(torneo_id) {
-    const { data, error } = await supabase
-      .from('inscripciones_equipo')
-      .select(`
-        id, estado, fecha_inscripcion,
-        equipos ( id, nombre, logo_url )
-      `)
-      .eq('torneo_id', torneo_id);
-
-    if (error) throw error;
-    return data;
+    return datos(await inscripciones().select('id, estado, fecha_inscripcion, equipos ( id, nombre, logo_url )').eq('torneo_id', torneo_id));
   },
-
   async buscarPorId(id) {
-    const { data, error } = await supabase
-      .from('inscripciones_equipo')
-      .select('*')
-      .eq('id', id)
-      .maybeSingle();
-
-    if (error) throw error;
-    return data;
+    return datos(await inscripciones().select('*').eq('id', id).maybeSingle());
   },
-
   async actualizarEstado(id, cambios) {
-    const { data, error } = await supabase
-      .from('inscripciones_equipo')
-      .update(cambios)
-      .eq('id', id)
-      .select()
-      .single();
-
-    if (error) throw error;
-    return data;
+    return datos(await inscripciones().update(cambios).eq('id', id).select().single());
   },
 
   // ---- TABLA DE POSICIONES ----
-
-  async crearTablaPosiciones(inscripcion_id) {
-    const { data, error } = await supabase
-      .from('tabla_posiciones')
-      .insert({ inscripcion_id })
-      .select()
-      .single();
-
-    if (error) throw error;
-    return data;
+  async asegurarFilaTabla(inscripcion_id) {
+    const existe = datos(await tabla().select('inscripcion_id').eq('inscripcion_id', inscripcion_id).limit(1).maybeSingle());
+    if (!existe) datos(await tabla().insert({ inscripcion_id }));
   },
-
+  async eliminarFilaTabla(inscripcion_id) {
+    datos(await tabla().delete().eq('inscripcion_id', inscripcion_id));
+  },
   async obtenerTablaPorTorneo(torneo_id) {
-    const { data, error } = await supabase
-      .from('tabla_posiciones')
-      .select(`
-        victorias, empates, derrotas, goles_favor, goles_contra, puntos, posicion,
-        inscripciones_equipo!inner (
-          torneo_id,
-          equipos ( id, nombre, logo_url )
-        )
-      `)
-      .eq('inscripciones_equipo.torneo_id', torneo_id)
-      .order('puntos', { ascending: false });
-
-    if (error) throw error;
-    return data;
-  },
-
-  async actualizarPosicion(inscripcion_id, cambios) {
-    const { data, error } = await supabase
-      .from('tabla_posiciones')
-      .update(cambios)
-      .eq('inscripcion_id', inscripcion_id)
-      .select()
-      .single();
-
-    if (error) throw error;
-    return data;
+    return datos(await tabla()
+      .select('victorias, empates, derrotas, goles_favor, goles_contra, puntos, posicion, inscripciones_equipo!inner ( torneo_id, equipos ( id, nombre, logo_url ) )')
+      .eq('inscripciones_equipo.torneo_id', torneo_id));
   },
 
   // ---- INVITACIONES ----
-
-  async crearInvitacion(datos) {
-    const { data, error } = await supabase
-      .from('invitaciones_equipo')
-      .insert(datos)
-      .select()
-      .single();
-
-    if (error) throw error;
-    return data;
+  async crearInvitacion(invitacion) {
+    return datos(await invitaciones().insert(invitacion).select().single());
   },
-
+  async buscarInvitacionPendiente(equipo_id, usuario_id) {
+    return datos(await invitaciones().select('id').eq('equipo_id', equipo_id).eq('usuario_id', usuario_id).eq('estado', 'Pendiente').limit(1).maybeSingle());
+  },
   async listarInvitacionesPorUsuario(usuario_id) {
-    const { data, error } = await supabase
-      .from('invitaciones_equipo')
-      .select(`
-        id, posicion_propuesta, estado, creado_en,
-        equipos ( id, nombre, logo_url )
-      `)
+    return datos(await invitaciones()
+      .select('id, posicion_propuesta, estado, creado_en, equipos ( id, nombre, logo_url )')
       .eq('usuario_id', usuario_id)
-      .eq('estado', 'Pendiente');
-
-    if (error) throw error;
-    return data;
+      .eq('estado', 'Pendiente'));
   },
-
   async buscarInvitacionPorId(id) {
-    const { data, error } = await supabase
-      .from('invitaciones_equipo')
-      .select('*')
-      .eq('id', id)
-      .maybeSingle();
-
-    if (error) throw error;
-    return data;
+    return datos(await invitaciones().select('*').eq('id', id).maybeSingle());
   },
-
   async actualizarInvitacion(id, cambios) {
-    const { data, error } = await supabase
-      .from('invitaciones_equipo')
-      .update(cambios)
-      .eq('id', id)
-      .select()
-      .single();
-
-    if (error) throw error;
-    return data;
-  }
+    return datos(await invitaciones().update(cambios).eq('id', id).select().single());
+  },
 };

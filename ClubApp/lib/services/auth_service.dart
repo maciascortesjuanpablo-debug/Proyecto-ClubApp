@@ -1,34 +1,66 @@
 import 'dart:convert';
-import 'package:flutter/material.dart';
+import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:http/http.dart' as http;
-import 'package:shared_preferences/shared_preferences.dart';
+import '../core/app_constants.dart';
 
 class AuthService {
-  static bool _isLoggedIn = false;
+  // El token se guarda cifrado (Keystore en Android, Keychain en iOS)
+  static const _storage = FlutterSecureStorage();
+
   static String? _token;
   static Map<String, dynamic>? _usuario;
 
-  static bool get isLoggedIn => _isLoggedIn;
-  static bool get isGuest => !_isLoggedIn;
+  static bool get isLoggedIn => _token != null;
+  static bool get isGuest => !isLoggedIn;
   static String? get token => _token;
   static Map<String, dynamic>? get usuario => _usuario;
 
-  // 10.0.2.2 = localhost de tu PC visto desde el emulador de Android
-  static const String baseUrl = 'http://10.0.2.2:3000/api';
-
-
+  /// Restaura la sesión guardada (si existe y el token no ha vencido)
   static Future<void> cargarSesion() async {
-    final prefs = await SharedPreferences.getInstance();
-    final tokenGuardado = prefs.getString('token');
+    try {
+      final token = await _storage.read(key: 'token');
+      final usuario = await _storage.read(key: 'usuario');
+      if (token == null || usuario == null || _vencido(token)) {
+        await logout();
+        return;
+      }
+      _token = token;
+      _usuario = jsonDecode(usuario) as Map<String, dynamic>;
+    } catch (_) {
+      await logout();
+    }
+  }
 
-    if (tokenGuardado != null) {
-      _token = tokenGuardado;
-      _isLoggedIn = true;
-      _usuario = {
-        'id': prefs.getString('usuario_id'),
-        'nombre': prefs.getString('usuario_nombre'),
-        'rol_id': prefs.getInt('rol_id'),
-      };
+  /// Lee la fecha de expiración (exp) del JWT sin validar la firma: eso lo hace el servidor
+  static bool _vencido(String jwt) {
+    try {
+      final payload = jsonDecode(utf8.decode(base64Url.decode(base64Url.normalize(jwt.split('.')[1]))));
+      return DateTime.now().millisecondsSinceEpoch ~/ 1000 >= (payload['exp'] as int);
+    } catch (_) {
+      return true;
+    }
+  }
+
+  /// POST al backend. Devuelve {exito, mensaje, ...datos de la respuesta}
+  static Future<Map<String, dynamic>> _post(
+    String ruta,
+    Map<String, dynamic> cuerpo, {
+    int ok = 200,
+    String errorPorDefecto = 'Ocurrió un error',
+    bool conSesion = false,
+  }) async {
+    try {
+      final r = await http
+          .post(
+            Uri.parse('${AppConfig.apiUrl}$ruta'),
+            headers: {'Content-Type': 'application/json', if (conSesion && _token != null) 'Authorization': 'Bearer $_token'},
+            body: jsonEncode(cuerpo),
+          )
+          .timeout(const Duration(seconds: 15));
+      final data = jsonDecode(r.body) as Map<String, dynamic>;
+      return r.statusCode == ok ? {...data, 'exito': true} : {'exito': false, 'mensaje': data['mensaje'] ?? errorPorDefecto};
+    } catch (_) {
+      return {'exito': false, 'mensaje': 'No se pudo conectar al servidor'};
     }
   }
 
@@ -40,12 +72,12 @@ class AuthService {
     required String fechaNacimiento, // formato yyyy-MM-dd
     required String ciudad,
     required String password,
-  }) async {
-    try {
-      final response = await http.post(
-        Uri.parse('$baseUrl/auth/registro'),
-        headers: {'Content-Type': 'application/json'},
-        body: jsonEncode({
+    required int rolId,
+    required String nivelJuego,
+  }) =>
+      _post(
+        '/auth/registro',
+        {
           'nombre': nombre,
           'apellido': apellido,
           'correo': correo,
@@ -53,187 +85,44 @@ class AuthService {
           'fecha_nacimiento': fechaNacimiento,
           'ciudad': ciudad,
           'password': password,
-        }),
+          'rol_id': rolId,
+          'nivel_juego': nivelJuego,
+        },
+        ok: 201,
+        errorPorDefecto: 'Error al registrar',
       );
-      final data = jsonDecode(response.body);
-      if (response.statusCode == 201) {
-        return {'exito': true, 'mensaje': data['mensaje']};
-      } else {
-        return {
-          'exito': false,
-          'mensaje': data['mensaje'] ?? 'Error al registrar',
-        };
-      }
-    } catch (e) {
-      return {'exito': false, 'mensaje': 'No se pudo conectar al servidor'};
-    }
-  }
-  static Future<Map<String, dynamic>> iniciarSesion({
-    required String correo,
-    required String password,
-  }) async {
-    try {
-      final response = await http.post(
-        Uri.parse('$baseUrl/auth/login'),
-        headers: {'Content-Type': 'application/json'},
-        body: jsonEncode({'correo': correo, 'password': password}),
-      );
-      final data = jsonDecode(response.body);
 
-      if (response.statusCode == 200) {
-        _token = data['token'];
-        _isLoggedIn = true;
-        _usuario = data['usuario'];
-        final prefs = await SharedPreferences.getInstance();
-        await prefs.setString('token', _token!);
-        await prefs.setString('usuario_id', _usuario!['id'].toString());
-        await prefs.setString('usuario_nombre', _usuario!['nombre']);
-        await prefs.setInt('rol_id', _usuario!['rol_id']);
-        return {'exito': true};
-      } else {
-        return {
-          'exito': false,
-          'mensaje': data['mensaje'] ?? 'Correo o contraseña incorrectos',
-        };
-      }
-    } catch (e) {
-      return {'exito': false, 'mensaje': 'No se pudo conectar al servidor'};
+  static Future<Map<String, dynamic>> iniciarSesion({required String correo, required String password}) async {
+    final r = await _post('/auth/login', {'correo': correo, 'password': password}, errorPorDefecto: 'Correo o contraseña incorrectos');
+    if (r['exito'] == true) {
+      _token = r['token'] as String;
+      _usuario = r['usuario'] as Map<String, dynamic>;
+      await _storage.write(key: 'token', value: _token);
+      await _storage.write(key: 'usuario', value: jsonEncode(_usuario));
     }
+    return r;
   }
+
   static Future<void> logout() async {
-    _isLoggedIn = false;
     _token = null;
     _usuario = null;
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.clear();
-  }
-  static Future<void> crearPerfilJugador({required String posicion}) async {
-    if (_token == null || _usuario == null) return;
     try {
-      await http.post(
-        Uri.parse('$baseUrl/perfil-jugador'),
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': 'Bearer $_token',
-        },
-        body: jsonEncode({'usuario_id': _usuario!['id'], 'posicion': posicion}),
-      );
-    } catch (_) {
-    }
-  }
-  static Future<Map<String, dynamic>> enviarCodigoRecuperacion({
-    required String correo,
-  }) async {
-    try {
-      final response = await http.post(
-        Uri.parse('$baseUrl/recuperar-password/enviar-codigo'),
-        headers: {'Content-Type': 'application/json'},
-        body: jsonEncode({'correo': correo}),
-      );
-
-      final data = jsonDecode(response.body);
-
-      if (response.statusCode == 200) {
-        return {'exito': true, 'mensaje': data['mensaje']};
-      } else {
-        return {
-          'exito': false,
-          'mensaje': data['mensaje'] ?? 'No se pudo enviar el código',
-        };
-      }
-    } catch (e) {
-      return {'exito': false, 'mensaje': 'No se pudo conectar al servidor'};
-    }
+      await _storage.delete(key: 'token');
+      await _storage.delete(key: 'usuario');
+    } catch (_) {}
   }
 
-  static Future<Map<String, dynamic>> verificarCodigoRecuperacion({
-    required String correo,
-    required String codigo,
-  }) async {
-    try {
-      final response = await http.post(
-        Uri.parse('$baseUrl/recuperar-password/verificar-codigo'),
-        headers: {'Content-Type': 'application/json'},
-        body: jsonEncode({'correo': correo, 'codigo': codigo}),
-      );
+  /// No bloquea el registro si falla: el usuario puede completar su perfil después
+  static Future<void> crearPerfilJugador({required String posicion}) =>
+      _post('/perfil-jugador', {'posicion': posicion}, ok: 201, conSesion: true);
 
-      final data = jsonDecode(response.body);
+  static Future<Map<String, dynamic>> enviarCodigoRecuperacion({required String correo}) =>
+      _post('/recuperar-password/enviar-codigo', {'correo': correo}, errorPorDefecto: 'No se pudo enviar el código');
 
-      if (response.statusCode == 200) {
-        return {'exito': true, 'tokenTemporal': data['tokenTemporal']};
-      } else {
-        return {
-          'exito': false,
-          'mensaje': data['mensaje'] ?? 'Código incorrecto o expirado',
-        };
-      }
-    } catch (e) {
-      return {'exito': false, 'mensaje': 'No se pudo conectar al servidor'};
-    }
-  }
+  static Future<Map<String, dynamic>> verificarCodigoRecuperacion({required String correo, required String codigo}) =>
+      _post('/recuperar-password/verificar-codigo', {'correo': correo, 'codigo': codigo}, errorPorDefecto: 'Código incorrecto o expirado');
 
-  static Future<Map<String, dynamic>> cambiarPasswordConToken({
-    required String tokenTemporal,
-    required String nuevaPassword,
-  }) async {
-    try {
-      final response = await http.post(
-        Uri.parse('$baseUrl/recuperar-password/cambiar-password'),
-        headers: {'Content-Type': 'application/json'},
-        body: jsonEncode({
-          'tokenTemporal': tokenTemporal,
-          'nuevaPassword': nuevaPassword,
-        }),
-      );
-
-      final data = jsonDecode(response.body);
-
-      if (response.statusCode == 200) {
-        return {'exito': true, 'mensaje': data['mensaje']};
-      } else {
-        return {
-          'exito': false,
-          'mensaje': data['mensaje'] ?? 'No se pudo cambiar la contraseña',
-        };
-      }
-    } catch (e) {
-      return {'exito': false, 'mensaje': 'No se pudo conectar al servidor'};
-    }
-  }
-
-  static void requireAuth(BuildContext context) {
-    if (isGuest) {
-      _showGuestAlert(context);
-    }
-  }
-
-  static void _showGuestAlert(BuildContext context) {
-    showDialog(
-      context: context,
-      builder: (c) => AlertDialog(
-        backgroundColor: const Color(0xFF1E293B),
-        title: const Text(
-          'Inicia Sesión',
-          style: TextStyle(color: Color(0xFFFFFFFF)),
-        ),
-        content: const Text(
-          'Necesitas una cuenta para esta acción',
-          style: TextStyle(color: Color(0xFF94A3B8)),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(c),
-            child: const Text('Cancelar'),
-          ),
-          TextButton(
-            onPressed: () {
-              Navigator.pop(c);
-              Navigator.pushNamed(c, '/login');
-            },
-            child: const Text('Registrarse'),
-          ),
-        ],
-      ),
-    );
-  }
+  static Future<Map<String, dynamic>> cambiarPasswordConToken({required String tokenTemporal, required String nuevaPassword}) =>
+      _post('/recuperar-password/cambiar-password', {'tokenTemporal': tokenTemporal, 'nuevaPassword': nuevaPassword},
+          errorPorDefecto: 'No se pudo cambiar la contraseña');
 }

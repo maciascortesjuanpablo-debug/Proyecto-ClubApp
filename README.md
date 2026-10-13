@@ -143,3 +143,17 @@ La base de datos fue diseñada en **Supabase (PostgreSQL)** con más de 25 tabla
   - *Tecnólogo en Análisis y Desarrollo de Software - SENA*
 
 ---
+
+---
+
+## Puesta en marcha tras la revisión de seguridad
+
+**Backend** (`backend/`)
+1. `npm install`
+2. Ejecuta `backend/sql/001_propietarios.sql` en el SQL Editor de Supabase (agrega `equipos.creado_por`; sin esto los equipos nuevos no tendrán dueño).
+3. `.env`: usa un `JWT_SECRET` aleatorio de 32+ caracteres. Opcionales: `SUPABASE_SERVICE_ROLE_KEY` (si existe, se usa en lugar de `SUPABASE_KEY`), `TRUST_PROXY=1` (si despliegas detrás de un proxy), `LOGO_URL`, `GROQ_MODEL`.
+4. `npm run dev`
+
+**App** (`ClubApp/`)
+- Emulador de Android: `flutter run` (usa `http://10.0.2.2:3000/api`).
+- Otro entorno: `flutter run --dart-define=API_URL=https://tu-servidor.com/api` (en release, solo HTTPS).

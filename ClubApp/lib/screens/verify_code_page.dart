@@ -1,338 +1,190 @@
-import 'package:flutter/material.dart';
 import 'dart:async';
+import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import '../core/app_colors.dart';
 import '../components/app_button.dart';
+import '../components/back_button_widget.dart';
+import '../components/icon_badge.dart';
 import '../services/auth_service.dart';
-import 'new_password_page.dart'; // ajusta el nombre si tu archivo se llama distinto
+import 'new_password_page.dart';
+
+const _espera = 60; // segundos antes de poder pedir otro código
 
 class VerifyCodePage extends StatefulWidget {
   final String email;
 
-  const VerifyCodePage({Key? key, required this.email}) : super(key: key);
+  const VerifyCodePage({super.key, required this.email});
 
   @override
   State<VerifyCodePage> createState() => _VerifyCodePageState();
 }
 
 class _VerifyCodePageState extends State<VerifyCodePage> {
-  final List<TextEditingController> _codeControllers = List.generate(
-    6,
-    (index) => TextEditingController(),
-  );
-  final List<FocusNode> _focusNodes = List.generate(6, (index) => FocusNode());
+  final _controllers = List.generate(6, (_) => TextEditingController());
+  final _focos = List.generate(6, (_) => FocusNode());
 
-  int _secondsRemaining = 120;
-  late Timer _timer;
-  bool _canResend = false;
+  int _segundos = _espera;
+  Timer? _timer;
   bool _cargando = false;
+
+  bool get _puedeReenviar => _segundos == 0;
 
   @override
   void initState() {
     super.initState();
-    _startTimer();
+    _iniciarTimer();
   }
 
-  void _startTimer() {
-    _timer = Timer.periodic(const Duration(seconds: 1), (timer) {
-      setState(() {
-        if (_secondsRemaining > 0) {
-          _secondsRemaining--;
-        } else {
-          _canResend = true;
-          _timer.cancel();
-        }
-      });
+  void _iniciarTimer() {
+    _timer?.cancel();
+    _segundos = _espera;
+    _timer = Timer.periodic(const Duration(seconds: 1), (t) {
+      if (!mounted) return t.cancel();
+      setState(() => _segundos--);
+      if (_segundos == 0) t.cancel();
     });
   }
 
-  String get _formattedTime {
-    int minutes = _secondsRemaining ~/ 60;
-    int seconds = _secondsRemaining % 60;
-    return '${minutes.toString().padLeft(2, '0')}:${seconds.toString().padLeft(2, '0')}';
-  }
+  String get _tiempo => '${(_segundos ~/ 60).toString().padLeft(2, '0')}:${(_segundos % 60).toString().padLeft(2, '0')}';
 
+  void _aviso(String texto) => ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(texto)));
+
+  /// Escribir avanza al siguiente cuadro, borrar retrocede y pegar el código completo lo reparte
   void _onCodeChanged(String value, int index) {
-    if (value.isNotEmpty) {
-      if (index < 5) {
-        _focusNodes[index + 1].requestFocus();
-      } else {
-        _focusNodes[index].unfocus();
-      }
+    if (value.isEmpty) {
+      if (index > 0) _focos[index - 1].requestFocus();
+      return;
+    }
+    final digitos = value.replaceAll(RegExp(r'\D'), '');
+    for (var i = 0; i < digitos.length && index + i < 6; i++) {
+      _controllers[index + i].text = digitos[i];
+    }
+    final ultimo = (index + digitos.length - 1).clamp(0, 5).toInt();
+    if (ultimo < 5) {
+      _focos[ultimo + 1].requestFocus();
+    } else {
+      _focos[5].unfocus();
     }
   }
 
   Future<void> _verifyCode() async {
-    String code = _codeControllers.map((c) => c.text).join();
-
-    if (code.length != 6) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Ingresa los 6 dígitos')),
-      );
-      return;
-    }
+    final code = _controllers.map((c) => c.text).join();
+    if (code.length != 6) return _aviso('Ingresa los 6 dígitos');
 
     setState(() => _cargando = true);
-
-    final resultado = await AuthService.verificarCodigoRecuperacion(
-      correo: widget.email,
-      codigo: code,
-    );
-
+    final resultado = await AuthService.verificarCodigoRecuperacion(correo: widget.email, codigo: code);
     if (!mounted) return;
     setState(() => _cargando = false);
 
-    if (resultado['exito']) {
-      Navigator.pushReplacement(
-        context,
-        MaterialPageRoute(
-          builder: (context) => NewPasswordPage(
-            tokenTemporal: resultado['tokenTemporal'],
-          ),
-        ),
-      );
+    if (resultado['exito'] == true) {
+      Navigator.pushReplacement(context, MaterialPageRoute(builder: (_) => NewPasswordPage(tokenTemporal: resultado['tokenTemporal'])));
     } else {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(resultado['mensaje'])),
-      );
+      _aviso(resultado['mensaje']);
     }
   }
 
   Future<void> _resendCode() async {
     final resultado = await AuthService.enviarCodigoRecuperacion(correo: widget.email);
-
     if (!mounted) return;
 
-    if (resultado['exito']) {
-      setState(() {
-        _secondsRemaining = 120;
-        _canResend = false;
-        for (var controller in _codeControllers) {
-          controller.clear();
-        }
-      });
-      _startTimer();
+    if (resultado['exito'] == true) {
+      for (final c in _controllers) {
+        c.clear();
+      }
+      _iniciarTimer();
     } else {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(resultado['mensaje'])),
-      );
+      _aviso(resultado['mensaje']);
     }
   }
 
   @override
   void dispose() {
-    _timer.cancel();
-    for (var controller in _codeControllers) {
-      controller.dispose();
+    _timer?.cancel();
+    for (final c in _controllers) {
+      c.dispose();
     }
-    for (var node in _focusNodes) {
-      node.dispose();
+    for (final f in _focos) {
+      f.dispose();
     }
     super.dispose();
   }
 
+  InputBorder _borde(Color color, [double ancho = 1]) =>
+      OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide(color: color, width: ancho));
+
   @override
   Widget build(BuildContext context) {
+    final textos = Theme.of(context).textTheme;
     return Scaffold(
       backgroundColor: AppColors.bgDark,
       body: SingleChildScrollView(
         child: Padding(
           padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 40),
           child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // Back Button
-              GestureDetector(
-                onTap: () => Navigator.pop(context),
-                child: const Row(
-                  children: [
-                    Icon(Icons.arrow_back, color: AppColors.secondary),
-                    SizedBox(width: 8),
-                    Text(
-                      'Volver',
-                      style: TextStyle(
-                        color: AppColors.secondary,
-                        fontSize: 14,
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-
+              BackButtonWidget(onPressed: () => Navigator.pop(context)),
               const SizedBox(height: 40),
-
-              // Icon
-              Center(
-                child: Container(
-                  width: 100,
-                  height: 100,
-                  decoration: BoxDecoration(
-                    color: AppColors.success,
-                    borderRadius: BorderRadius.circular(16),
-                  ),
-                  child: const Center(
-                    child: Icon(
-                      Icons.mail_outline,
-                      color: AppColors.textWhite,
-                      size: 80,
-                    ),
-                  ),
-                ),
-              ),
-
+              const IconBadge(icon: Icons.mail_outline, color: AppColors.success, iconColor: AppColors.textWhite),
               const SizedBox(height: 32),
-
-              // Title
-              Center(
-                child: Text(
-                  'Revisa tu correo',
-                  style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                    color: AppColors.textWhite,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-              ),
-
+              Text('Revisa tu correo', style: textos.headlineSmall?.copyWith(color: AppColors.textWhite, fontWeight: FontWeight.bold)),
               const SizedBox(height: 12),
-
-              // Subtitle
-              Center(
-                child: Text(
-                  'Enviamos un código de 6 dígitos a\n${widget.email}',
-                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                    color: AppColors.textGray,
-                    fontSize: 15
-                  ),
-                  textAlign: TextAlign.center,
-                ),
-              ),
-
+              Text('Enviamos un código de 6 dígitos a\n${widget.email}',
+                  style: textos.bodySmall?.copyWith(color: AppColors.textGray, fontSize: 15), textAlign: TextAlign.center),
               const SizedBox(height: 32),
-
-              // Code Input Fields
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                 children: List.generate(
                   6,
-                  (index) => SizedBox(
+                  (i) => SizedBox(
                     width: 50,
                     height: 56,
                     child: TextField(
-                      controller: _codeControllers[index],
-                      focusNode: _focusNodes[index],
+                      controller: _controllers[i],
+                      focusNode: _focos[i],
                       keyboardType: TextInputType.number,
-                      maxLength: 1,
+                      inputFormatters: [FilteringTextInputFormatter.digitsOnly],
                       textAlign: TextAlign.center,
-                      style: const TextStyle(
-                        color: AppColors.textWhite,
-                        fontSize: 20,
-                        fontWeight: FontWeight.bold,
-                      ),
-                      onChanged: (value) => _onCodeChanged(value, index),
+                      style: const TextStyle(color: AppColors.textWhite, fontSize: 20, fontWeight: FontWeight.bold),
+                      onChanged: (v) => _onCodeChanged(v, i),
                       decoration: InputDecoration(
-                        counterText: '',
                         filled: true,
                         fillColor: AppColors.bgCard,
-                        border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(12),
-                          borderSide: const BorderSide(
-                            color: Color(0xFF334155),
-                          ),
-                        ),
-                        enabledBorder: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(12),
-                          borderSide: const BorderSide(
-                            color: Color(0xFF334155),
-                          ),
-                        ),
-                        focusedBorder: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(12),
-                          borderSide: const BorderSide(
-                            color: AppColors.secondary,
-                            width: 2,
-                          ),
-                        ),
+                        border: _borde(AppColors.bgCardLight),
+                        enabledBorder: _borde(AppColors.bgCardLight),
+                        focusedBorder: _borde(AppColors.secondary, 2),
                       ),
                     ),
                   ),
                 ),
               ),
-
               const SizedBox(height: 32),
-
-              // Resend Link
-              Center(
-                child: Column(
-                  children: [
-                    Text(
-                      '¿No recibiste el código?',
-                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                        color: AppColors.textGray,
-                      ),
-                    ),
-                    const SizedBox(height: 4),
-                    GestureDetector(
-                      onTap: _canResend ? _resendCode : null,
-                      child: Text(
-                        _canResend
-                            ? 'Reenviar'
-                            : 'Reenviar (${_formattedTime})',
-                        style: TextStyle(
-                          color: _canResend
-                              ? AppColors.secondary
-                              : AppColors.textGrayDark,
-                          fontWeight: FontWeight.w600,
-                          fontSize: 14,
-                        ),
-                      ),
-                    ),
-                  ],
+              Text('¿No recibiste el código?', style: textos.bodySmall?.copyWith(color: AppColors.textGray)),
+              const SizedBox(height: 4),
+              GestureDetector(
+                onTap: _puedeReenviar ? _resendCode : null,
+                child: Text(
+                  _puedeReenviar ? 'Reenviar' : 'Reenviar ($_tiempo)',
+                  style: TextStyle(color: _puedeReenviar ? AppColors.secondary : AppColors.textGrayDark, fontWeight: FontWeight.w600, fontSize: 14),
                 ),
               ),
-
               const SizedBox(height: 32),
-
-              // Verify Button
-              AppButton(
-                label: _cargando ? 'Verificando...' : 'Verificar Código',
-                onPressed: _cargando ? () {} : _verifyCode,
-              ),
-
+              AppButton(label: 'Verificar Código', isLoading: _cargando, onPressed: _verifyCode),
               const SizedBox(height: 20),
-
-              // Security Message
-              Center(
-                child: Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 16,
-                    vertical: 12,
-                  ),
-                  decoration: BoxDecoration(
-                    color: AppColors.success.withOpacity(0.1),
-                    borderRadius: BorderRadius.circular(8),
-                    border: Border.all(
-                      color: AppColors.success,
-                      width: 1,
-                    ),
-                  ),
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      const Icon(
-                        Icons.check_circle,
-                        color: AppColors.success,
-                        size: 18,
-                      ),
-                      const SizedBox(width: 8),
-                      Text(
-                        'Por su seguridad, el código expirará\nen 2 minutos',
-                        style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                          color: AppColors.success,
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
-                    ],
-                  ),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                decoration: BoxDecoration(
+                  color: AppColors.success.withValues(alpha: 0.1),
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(color: AppColors.success),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const Icon(Icons.check_circle, color: AppColors.success, size: 18),
+                    const SizedBox(width: 8),
+                    Text('Por tu seguridad, el código expira\nen 10 minutos',
+                        style: textos.bodySmall?.copyWith(color: AppColors.success, fontWeight: FontWeight.w600)),
+                  ],
                 ),
               ),
             ],

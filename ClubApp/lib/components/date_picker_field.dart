@@ -12,7 +12,7 @@ class DatePickerField extends StatefulWidget {
   final DateTime? lastDate;
 
   const DatePickerField({
-    Key? key,
+    super.key,
     required this.label,
     required this.hint,
     required this.controller,
@@ -20,7 +20,7 @@ class DatePickerField extends StatefulWidget {
     this.initialDate,
     this.firstDate,
     this.lastDate,
-  }) : super(key: key);
+  });
 
   @override
   State<DatePickerField> createState() => _DatePickerFieldState();

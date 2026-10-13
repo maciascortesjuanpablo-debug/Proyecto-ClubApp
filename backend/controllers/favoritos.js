@@ -1,4 +1,5 @@
 import { favoritoModel } from '../models/favoritos.js';
+import { fallo } from '../utils/helpers.js';
 
 export const agregarFavorito = async (req, res) => {
   try {
@@ -6,11 +7,12 @@ export const agregarFavorito = async (req, res) => {
     if (!torneo_id && !equipo_id) {
       return res.status(400).json({ mensaje: 'Debes enviar torneo_id o equipo_id' });
     }
-    const favorito = await favoritoModel.agregar({ usuario_id: req.usuario.id, torneo_id, equipo_id });
-    res.status(201).json({ mensaje: 'Agregado a favoritos', favorito });
+    const nuevo = { usuario_id: req.usuario.id, torneo_id, equipo_id };
+    if (await favoritoModel.existe(nuevo)) return res.status(409).json({ mensaje: 'Ya está en tus favoritos' });
+
+    res.status(201).json({ mensaje: 'Agregado a favoritos', favorito: await favoritoModel.agregar(nuevo) });
   } catch (error) {
-    console.error(error);
-    res.status(500).json({ mensaje: 'Error al agregar a favoritos', error: error.message });
+    fallo(res, error, 'Error al agregar a favoritos');
   }
 };
 
@@ -18,17 +20,17 @@ export const obtenerFavoritos = async (req, res) => {
   try {
     res.json(await favoritoModel.listarPorUsuario(req.params.usuarioId));
   } catch (error) {
-    console.error(error);
-    res.status(500).json({ mensaje: 'Error al obtener los favoritos', error: error.message });
+    fallo(res, error, 'Error al obtener los favoritos');
   }
 };
 
 export const eliminarFavorito = async (req, res) => {
   try {
-    await favoritoModel.eliminar(req.params.id);
+    if (!(await favoritoModel.eliminar(req.params.id, req.usuario.id))) {
+      return res.status(404).json({ mensaje: 'Favorito no encontrado' });
+    }
     res.json({ mensaje: 'Eliminado de favoritos' });
   } catch (error) {
-    console.error(error);
-    res.status(500).json({ mensaje: 'Error al eliminar de favoritos', error: error.message });
+    fallo(res, error, 'Error al eliminar de favoritos');
   }
 };

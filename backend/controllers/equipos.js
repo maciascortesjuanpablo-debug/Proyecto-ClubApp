@@ -1,67 +1,75 @@
 import { equipoModel } from '../models/equipos.js';
+import { fallo, pick, texto } from '../utils/helpers.js';
+import { esDuenoEquipo } from '../utils/permisos.js';
+
+// Middleware: carga el equipo de :id y exige que el usuario sea su dueño (o Admin)
+export const equipoPropio = async (req, res, next) => {
+  try {
+    const equipo = await equipoModel.buscarPorId(req.params.id);
+    if (!equipo) return res.status(404).json({ mensaje: 'Equipo no encontrado' });
+    if (!esDuenoEquipo(req, equipo)) return res.status(403).json({ mensaje: 'Este equipo no es tuyo' });
+    req.equipo = equipo;
+    next();
+  } catch (error) {
+    fallo(res, error, 'Error al verificar el equipo');
+  }
+};
 
 export const crearEquipo = async (req, res) => {
   try {
-    const { nombre, logo_url } = req.body;
+    const nombre = texto(req.body.nombre, 80);
+    if (!nombre) return res.status(400).json({ mensaje: 'El nombre del equipo es obligatorio' });
 
-    if (!nombre) {
-      return res.status(400).json({ mensaje: 'El nombre del equipo es obligatorio' });
+    const nuevo = { nombre, logo_url: req.body.logo_url };
+    let equipo;
+    try {
+      equipo = await equipoModel.crear({ ...nuevo, creado_por: req.usuario.id });
+    } catch (error) {
+      // Columna `creado_por` aún no creada: ejecuta backend/sql/001_propietarios.sql
+      if (!/creado_por/.test(error.message)) throw error;
+      console.warn('⚠️  Falta la columna equipos.creado_por (ver backend/sql/001_propietarios.sql)');
+      equipo = await equipoModel.crear(nuevo);
     }
-
-    const equipo = await equipoModel.crear({ nombre, logo_url });
     res.status(201).json({ mensaje: 'Equipo creado', equipo });
-
   } catch (error) {
-    console.error(error);
-    res.status(500).json({ mensaje: 'Error al crear el equipo', error: error.message });
+    fallo(res, error, 'Error al crear el equipo');
   }
 };
 
 export const obtenerEquipos = async (req, res) => {
   try {
-    const equipos = await equipoModel.listarTodos();
-    res.json(equipos);
+    res.json(await equipoModel.listarTodos());
   } catch (error) {
-    console.error(error);
-    res.status(500).json({ mensaje: 'Error al obtener equipos', error: error.message });
+    fallo(res, error, 'Error al obtener equipos');
   }
 };
 
 export const obtenerEquipoPorId = async (req, res) => {
   try {
-    const { id } = req.params;
-    const equipo = await equipoModel.buscarPorId(id);
-
-    if (!equipo) {
-      return res.status(404).json({ mensaje: 'Equipo no encontrado' });
-    }
-
+    const equipo = await equipoModel.buscarPorId(req.params.id);
+    if (!equipo) return res.status(404).json({ mensaje: 'Equipo no encontrado' });
     res.json(equipo);
   } catch (error) {
-    console.error(error);
-    res.status(500).json({ mensaje: 'Error al obtener el equipo', error: error.message });
+    fallo(res, error, 'Error al obtener el equipo');
   }
 };
 
 export const actualizarEquipo = async (req, res) => {
   try {
-    const { id } = req.params;
-    const equipo = await equipoModel.actualizar(id, req.body);
-    res.json({ mensaje: 'Equipo actualizado', equipo });
+    const cambios = pick(req.body, ['nombre', 'logo_url']);
+    if (!Object.keys(cambios).length) return res.status(400).json({ mensaje: 'No hay campos válidos para actualizar' });
+    res.json({ mensaje: 'Equipo actualizado', equipo: await equipoModel.actualizar(req.params.id, cambios) });
   } catch (error) {
-    console.error(error);
-    res.status(500).json({ mensaje: 'Error al actualizar el equipo', error: error.message });
+    fallo(res, error, 'Error al actualizar el equipo');
   }
 };
 
 export const eliminarEquipo = async (req, res) => {
   try {
-    const { id } = req.params;
-    await equipoModel.eliminar(id);
+    await equipoModel.eliminar(req.params.id);
     res.json({ mensaje: 'Equipo eliminado' });
   } catch (error) {
-    console.error(error);
-    res.status(500).json({ mensaje: 'Error al eliminar el equipo', error: error.message });
+    fallo(res, error, 'Error al eliminar el equipo');
   }
 };
 
@@ -69,52 +77,42 @@ export const eliminarEquipo = async (req, res) => {
 
 export const agregarJugadorEquipo = async (req, res) => {
   try {
-    const { id } = req.params; // equipo_id
     const { usuario_id, posicion, dorsal } = req.body;
-
-    if (!usuario_id || !posicion) {
-      return res.status(400).json({ mensaje: 'usuario_id y posicion son obligatorios' });
+    if (!usuario_id || !posicion) return res.status(400).json({ mensaje: 'usuario_id y posicion son obligatorios' });
+    if (await equipoModel.buscarJugador(req.params.id, usuario_id)) {
+      return res.status(409).json({ mensaje: 'El jugador ya está en el equipo' });
     }
-
-    const jugador = await equipoModel.agregarJugador({ equipo_id: id, usuario_id, posicion, dorsal });
+    const jugador = await equipoModel.agregarJugador({ equipo_id: req.params.id, usuario_id, posicion, dorsal });
     res.status(201).json({ mensaje: 'Jugador agregado al equipo', jugador });
-
   } catch (error) {
-    console.error(error);
-    res.status(500).json({ mensaje: 'Error al agregar el jugador', error: error.message });
+    fallo(res, error, 'Error al agregar el jugador');
   }
 };
 
 export const obtenerPlantilla = async (req, res) => {
   try {
-    const { id } = req.params;
-    const jugadores = await equipoModel.listarJugadores(id);
-    res.json(jugadores);
+    res.json(await equipoModel.listarJugadores(req.params.id));
   } catch (error) {
-    console.error(error);
-    res.status(500).json({ mensaje: 'Error al obtener la plantilla', error: error.message });
+    fallo(res, error, 'Error al obtener la plantilla');
   }
 };
 
 export const actualizarJugadorEquipo = async (req, res) => {
   try {
-    const { id, usuarioId } = req.params;
-    const jugador = await equipoModel.actualizarJugador(id, usuarioId, req.body);
-    res.json({ mensaje: 'Jugador actualizado', jugador });
+    const cambios = pick(req.body, ['posicion', 'dorsal', 'estado_convocatoria', 'es_titular']);
+    if (!Object.keys(cambios).length) return res.status(400).json({ mensaje: 'No hay campos válidos para actualizar' });
+    res.json({ mensaje: 'Jugador actualizado', jugador: await equipoModel.actualizarJugador(req.params.id, req.params.usuarioId, cambios) });
   } catch (error) {
-    console.error(error);
-    res.status(500).json({ mensaje: 'Error al actualizar el jugador', error: error.message });
+    fallo(res, error, 'Error al actualizar el jugador');
   }
 };
 
 export const eliminarJugadorEquipo = async (req, res) => {
   try {
-    const { id, usuarioId } = req.params;
-    await equipoModel.eliminarJugador(id, usuarioId);
+    await equipoModel.eliminarJugador(req.params.id, req.params.usuarioId);
     res.json({ mensaje: 'Jugador eliminado del equipo' });
   } catch (error) {
-    console.error(error);
-    res.status(500).json({ mensaje: 'Error al eliminar el jugador', error: error.message });
+    fallo(res, error, 'Error al eliminar el jugador');
   }
 };
 
@@ -122,40 +120,28 @@ export const eliminarJugadorEquipo = async (req, res) => {
 
 export const agregarStaffEquipo = async (req, res) => {
   try {
-    const { id } = req.params;
     const { usuario_id, cargo } = req.body;
-
-    if (!usuario_id || !cargo) {
-      return res.status(400).json({ mensaje: 'usuario_id y cargo son obligatorios' });
-    }
-
-    const staff = await equipoModel.agregarStaff({ equipo_id: id, usuario_id, cargo });
+    if (!usuario_id || !cargo) return res.status(400).json({ mensaje: 'usuario_id y cargo son obligatorios' });
+    const staff = await equipoModel.agregarStaff({ equipo_id: req.params.id, usuario_id, cargo });
     res.status(201).json({ mensaje: 'Staff agregado', staff });
-
   } catch (error) {
-    console.error(error);
-    res.status(500).json({ mensaje: 'Error al agregar el staff', error: error.message });
+    fallo(res, error, 'Error al agregar el staff');
   }
 };
 
 export const obtenerStaffEquipo = async (req, res) => {
   try {
-    const { id } = req.params;
-    const staff = await equipoModel.listarStaff(id);
-    res.json(staff);
+    res.json(await equipoModel.listarStaff(req.params.id));
   } catch (error) {
-    console.error(error);
-    res.status(500).json({ mensaje: 'Error al obtener el staff', error: error.message });
+    fallo(res, error, 'Error al obtener el staff');
   }
 };
 
 export const eliminarStaffEquipo = async (req, res) => {
   try {
-    const { id, usuarioId } = req.params;
-    await equipoModel.eliminarStaff(id, usuarioId);
+    await equipoModel.eliminarStaff(req.params.id, req.params.usuarioId);
     res.json({ mensaje: 'Staff eliminado del equipo' });
   } catch (error) {
-    console.error(error);
-    res.status(500).json({ mensaje: 'Error al eliminar el staff', error: error.message });
+    fallo(res, error, 'Error al eliminar el staff');
   }
 };

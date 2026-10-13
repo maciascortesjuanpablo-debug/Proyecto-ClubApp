@@ -1,37 +1,29 @@
-
-
 import { supabase } from '../config/supabase.js';
+import { datos } from '../utils/helpers.js';
+
+const estadisticas = () => supabase.from('estadisticas_jugador');
+const CAMPOS = 'id, goles, asistencias, tarjetas_amarillas, tarjetas_rojas, minutos_jugados';
 
 export const estadisticaModel = {
   async crear(estadistica) {
-    const { data, error } = await supabase.from('estadisticas_jugador').insert(estadistica).select().single();
-    if (error) throw error;
-    return data;
+    return datos(await estadisticas().insert(estadistica).select().single());
+  },
+  async buscarPorId(id) {
+    return datos(await estadisticas().select('*').eq('id', id).maybeSingle());
   },
   async listarPorEvento(evento_id) {
-    const { data, error } = await supabase
-      .from('estadisticas_jugador')
-      .select('id, goles, asistencias, tarjetas_amarillas, tarjetas_rojas, minutos_jugados, usuarios(id, nombre, apellido), equipos(id, nombre)')
-      .eq('evento_id', evento_id);
-    if (error) throw error;
-    return data;
+    return datos(await estadisticas().select(`${CAMPOS}, usuarios(id, nombre, apellido), equipos(id, nombre)`).eq('evento_id', evento_id));
   },
   async listarPorJugador(usuario_id) {
-    const { data, error } = await supabase
-      .from('estadisticas_jugador')
-      .select('id, goles, asistencias, tarjetas_amarillas, tarjetas_rojas, minutos_jugados, creado_en, eventos_calendario(id, fecha, torneo_id)')
+    return datos(await estadisticas()
+      .select(`${CAMPOS}, creado_en, eventos_calendario(id, fecha, torneo_id)`)
       .eq('usuario_id', usuario_id)
-      .order('creado_en', { ascending: false });
-    if (error) throw error;
-    return data;
+      .order('creado_en', { ascending: false }));
   },
   async actualizar(id, cambios) {
-    const { data, error } = await supabase.from('estadisticas_jugador').update(cambios).eq('id', id).select().single();
-    if (error) throw error;
-    return data;
+    return datos(await estadisticas().update(cambios).eq('id', id).select().single());
   },
   async eliminar(id) {
-    const { error } = await supabase.from('estadisticas_jugador').delete().eq('id', id);
-    if (error) throw error;
-  }
+    datos(await estadisticas().delete().eq('id', id));
+  },
 };
