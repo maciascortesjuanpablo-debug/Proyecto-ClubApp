@@ -38,8 +38,8 @@ class BottomNavBar extends StatelessWidget {
           label: 'Equipo',
         ),
         BottomNavigationBarItem(
-          icon: Icon(Icons.calendar_today),
-          label: 'Calendario',
+          icon: Icon(Icons.smart_toy_outlined),
+          label: 'Scout AI',
         ),
       ],
     );

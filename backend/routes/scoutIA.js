@@ -1,5 +1,8 @@
 import { Router } from 'express';
-import { chatConScout, obtenerHistorialScout, recomendarJugador, generarReporteEquipo } from '../controllers/scoutIA.js';
+import {
+  chatConScout, obtenerHistorialScout, recomendarJugador, generarReporteEquipo,
+  listarConversaciones, renombrarConversacion, eliminarConversacion,
+} from '../controllers/scoutIA.js';
 import { verificarToken, verificarRol } from '../middlewares/middlewares.js';
 import { limiteScout } from '../middlewares/limites.js';
 import { ROLES } from '../utils/helpers.js';
@@ -11,6 +14,9 @@ router.use(verificarToken, limiteScout); // todo Scout AI requiere sesión y tie
 
 router.post('/chat', chatConScout);
 router.get('/chat/historial/:conversacionId', obtenerHistorialScout);
+router.get('/conversaciones', listarConversaciones);
+router.put('/conversaciones/:id', renombrarConversacion);
+router.delete('/conversaciones/:id', eliminarConversacion);
 router.post('/recomendaciones', analistas, recomendarJugador);
 router.post('/reportes', analistas, generarReporteEquipo);
 
