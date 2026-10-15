@@ -10,6 +10,7 @@ import '../components/form_section.dart';
 import '../components/progress_bar.dart';
 import '../components/success_dialog.dart';
 import '../services/auth_service.dart';
+import 'two_factor_page.dart';
 
 class RegisterPage3 extends StatefulWidget {
   final String nombre;
@@ -64,46 +65,69 @@ class _RegisterPage3State extends State<RegisterPage3> {
   }
 
   Future<void> _register() async {
-    if (!(_formKey.currentState?.validate() ?? false)) return;
-    if (!_acceptTerms) return _aviso('Debes aceptar los términos y condiciones');
+  if (!(_formKey.currentState?.validate() ?? false)) return;
+  if (!_acceptTerms) return _aviso('Debes aceptar los términos y condiciones');
 
-    setState(() => _cargando = true);
+  setState(() => _cargando = true);
 
-    final registro = await AuthService.registrar(
-      nombre: widget.nombre,
-      apellido: widget.apellido,
-      correo: widget.correo,
-      numeroCelular: widget.celular,
-      fechaNacimiento: _formatearFecha(widget.fechaNacimiento),
-      ciudad: widget.ciudad,
-      password: _passwordController.text,
-      rolId: widget.rolId,
-      nivelJuego: widget.nivelJuego,
-    );
+  final registro = await AuthService.registrar(
+    nombre: widget.nombre,
+    apellido: widget.apellido,
+    correo: widget.correo,
+    numeroCelular: widget.celular,
+    fechaNacimiento: _formatearFecha(widget.fechaNacimiento),
+    ciudad: widget.ciudad,
+    password: _passwordController.text,
+    rolId: widget.rolId,
+    nivelJuego: widget.nivelJuego,
+  );
 
-    if (registro['exito'] != true) {
-      if (!mounted) return;
-      setState(() => _cargando = false);
-      return _aviso(registro['mensaje']);
-    }
-
-    final login = await AuthService.iniciarSesion(correo: widget.correo, password: _passwordController.text);
-    if (login['exito'] == true && widget.posicion.isNotEmpty) await AuthService.crearPerfilJugador(posicion: widget.posicion);
-
+  if (registro['exito'] != true) {
     if (!mounted) return;
     setState(() => _cargando = false);
-
-    // Si el inicio de sesión automático falla, la cuenta ya existe: se manda al login
-    if (login['exito'] != true) return irALogin(context);
-
-    await SuccessDialog.show(
-      context: context,
-      title: '¡Cuenta Creada!',
-      message: 'Bienvenido a ClubApp, ${widget.nombre}',
-      buttonText: 'Empezar',
-      onButtonPressed: () => irAInicio(context),
-    );
+    return _aviso(registro['mensaje']);
   }
+
+  final login = await AuthService.iniciarSesion(correo: widget.correo, password: _passwordController.text);
+
+  if (!mounted) return;
+  setState(() => _cargando = false);
+
+  // Si el inicio de sesión automático falla, la cuenta ya existe: se manda al login
+  if (login['exito'] != true) return irALogin(context);
+
+
+  final mensaje = 'Bienvenido a ClubApp, ${widget.nombre}';
+
+  // El código llega al correo con el que se registró, así también se confirma que es suyo
+  if (login['requiere2fa'] == true) {
+    Navigator.pushAndRemoveUntil(
+      context,
+      MaterialPageRoute(
+        builder: (_) => TwoFactorPage(
+          tokenDesafio: login['tokenDesafio'] as String,
+          correo: login['correo'] as String,
+          titulo: '¡Cuenta Creada!',
+          mensaje: mensaje,
+          posicionPerfil: widget.posicion,
+          desdeRegistro: true,
+        ),
+      ),
+      (_) => false,
+    );
+    return;
+  }
+
+  if (widget.posicion.isNotEmpty) await AuthService.crearPerfilJugador(posicion: widget.posicion);
+  if (!mounted) return;
+  await SuccessDialog.show(
+    context: context,
+    title: '¡Cuenta Creada!',
+    message: mensaje,
+    buttonText: 'Empezar',
+    onButtonPressed: () => irAInicio(context),
+  );
+}
 
   Widget get _requirementsCard => Container(
         padding: const EdgeInsets.all(16),

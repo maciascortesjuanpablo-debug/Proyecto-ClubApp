@@ -7,6 +7,7 @@ import '../components/citydrop_down.dart';
 import '../components/form_section.dart';
 import '../components/progress_bar.dart';
 import 'register_page_3.dart';
+import '../core/perfil_constants.dart';
 
 // Rol visible -> (icono, id en la tabla `roles`)
 const _roles = {
@@ -15,7 +16,7 @@ const _roles = {
   'Organizador': (Icons.groups, 4),
   'Árbitro': (Icons.sports_score_outlined, 5),
 };
-const _niveles = ['Principiante', 'Intermedio', 'Amateur Competitivo', 'Profesional'];
+
 
 class RegisterPage2 extends StatefulWidget {
   final String nombre;
@@ -172,7 +173,7 @@ class _RegisterPage2State extends State<RegisterPage2> {
                           dropdownColor: AppColors.bgCard,
                           onChanged: (v) => setState(() => _selectedLevel = v ?? _selectedLevel),
                           items: [
-                            for (final n in _niveles) DropdownMenuItem(value: n, child: Text(n, style: const TextStyle(color: AppColors.textWhite))),
+                            for (final n in nivelesJuego) DropdownMenuItem(value: n, child: Text(n, style: const TextStyle(color: AppColors.textWhite))),
                           ],
                         ),
                       ),

@@ -13,6 +13,7 @@ import '../components/success_dialog.dart';
 import '../services/auth_service.dart';
 import 'forgot_password_page.dart';
 import 'register_page_1.dart';
+import 'two_factor_page.dart';
 
 class LoginPage extends StatefulWidget {
   const LoginPage({super.key});
@@ -35,24 +36,33 @@ class _LoginPageState extends State<LoginPage> {
   }
 
   Future<void> _login() async {
-    if (!(_formKey.currentState?.validate() ?? false)) return;
-    setState(() => _cargando = true);
+  if (!(_formKey.currentState?.validate() ?? false)) return;
+  setState(() => _cargando = true);
 
-    final resultado = await AuthService.iniciarSesion(correo: _emailController.text.trim(), password: _passwordController.text);
+  final resultado = await AuthService.iniciarSesion(correo: _emailController.text.trim(), password: _passwordController.text);
 
-    if (!mounted) return;
-    setState(() => _cargando = false);
+  if (!mounted) return;
+  setState(() => _cargando = false);
 
-    if (resultado['exito'] != true) return mostrarError(context, resultado['mensaje']);
+  if (resultado['exito'] != true) return mostrarError(context, resultado['mensaje']);
 
-    final nombre = AuthService.usuario?['nombre'] ?? '';
-    await SuccessDialog.show(
-      context: context,
-      title: '¡Bienvenido de nuevo!',
-      message: nombre.isNotEmpty ? 'Hola de nuevo, $nombre' : 'Inicio de sesión exitoso',
-      onButtonPressed: () => irAInicio(context),
-    );
-  }
+  // Contraseña correcta: falta confirmar con el código que llegó al correo
+if (resultado['requiere2fa'] == true) {
+  Navigator.push(
+    context,
+    MaterialPageRoute(builder: (_) => TwoFactorPage(tokenDesafio: resultado['tokenDesafio'] as String, correo: resultado['correo'] as String)),
+  );
+  return;
+}
+
+  final nombre = AuthService.usuario?['nombre'] ?? '';
+  await SuccessDialog.show(
+    context: context,
+    title: '¡Bienvenido de nuevo!',
+    message: nombre.isNotEmpty ? 'Hola de nuevo, $nombre' : 'Inicio de sesión exitoso',
+    onButtonPressed: () => irAInicio(context),
+  );
+}
 
   void _ir(Widget pagina) => Navigator.push(context, MaterialPageRoute(builder: (_) => pagina));
 

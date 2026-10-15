@@ -92,15 +92,35 @@ class AuthService {
         errorPorDefecto: 'Error al registrar',
       );
 
+  /// Paso 1. Con la contraseña correcta el backend NO da sesión: devuelve {requiere2fa, tokenDesafio, correo}
+  /// y manda un código al correo. La sesión se abre en verificarDosPasos.
   static Future<Map<String, dynamic>> iniciarSesion({required String correo, required String password}) async {
     final r = await _post('/auth/login', {'correo': correo, 'password': password}, errorPorDefecto: 'Correo o contraseña incorrectos');
-    if (r['exito'] == true) {
-      _token = r['token'] as String;
-      _usuario = r['usuario'] as Map<String, dynamic>;
-      await _storage.write(key: 'token', value: _token);
-      await _storage.write(key: 'usuario', value: jsonEncode(_usuario));
-    }
+    return r['exito'] == true && r['requiere2fa'] != true ? await _abrirSesion(r) : r; // sin segundo paso (DOS_PASOS=false) entra directo
+  }
+
+  /// Paso 2: valida el código del correo y abre la sesión
+  static Future<Map<String, dynamic>> verificarDosPasos({required String tokenDesafio, required String codigo}) async {
+    final r = await _post('/auth/verificar-2fa', {'tokenDesafio': tokenDesafio, 'codigo': codigo}, errorPorDefecto: 'Código incorrecto o expirado');
+    return r['exito'] == true ? await _abrirSesion(r) : r;
+  }
+
+  static Future<Map<String, dynamic>> reenviarDosPasos({required String tokenDesafio}) =>
+      _post('/auth/reenviar-2fa', {'tokenDesafio': tokenDesafio}, errorPorDefecto: 'No se pudo reenviar el código');
+
+  static Future<Map<String, dynamic>> _abrirSesion(Map<String, dynamic> r) async {
+    _token = r['token'] as String;
+    _usuario = r['usuario'] as Map<String, dynamic>;
+    await _storage.write(key: 'token', value: _token);
+    await _storage.write(key: 'usuario', value: jsonEncode(_usuario));
     return r;
+  }
+
+  /// Actualiza en memoria y en el almacenamiento seguro los datos del usuario (p. ej. tras editar el perfil)
+  static Future<void> actualizarUsuarioLocal(Map<String, dynamic> cambios) async {
+    if (_usuario == null) return;
+    _usuario = {..._usuario!, ...cambios};
+    await _storage.write(key: 'usuario', value: jsonEncode(_usuario));
   }
 
   static Future<void> logout() async {
