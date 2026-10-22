@@ -30,6 +30,7 @@ class _AdminTorneosTabState extends State<AdminTorneosTab> with AutomaticKeepAli
   Future<void> _cargar() async {
     final r = await AdminService.torneos();
     if (!mounted) return;
+
     setState(() {
       _cargando = false;
       _error = r['exito'] == true ? null : r['mensaje'].toString();
@@ -62,6 +63,7 @@ class _AdminTorneosTabState extends State<AdminTorneosTab> with AutomaticKeepAli
             hintStyle: const TextStyle(color: AppColors.textGray, fontSize: 13),
             prefixIcon: const Icon(Icons.search, color: AppColors.textGray),
             filled: true,
+
             fillColor: AppColors.bgCard,
             contentPadding: const EdgeInsets.symmetric(vertical: 12),
             border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),

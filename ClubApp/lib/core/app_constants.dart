@@ -4,6 +4,12 @@ class AppConfig {
   /// Dirección del backend. En el emulador de Android, 10.0.2.2 es el localhost de tu PC.
   /// Para otro entorno: flutter run --dart-define=API_URL=https://tu-servidor.com/api
   static const String apiUrl = String.fromEnvironment('API_URL', defaultValue: 'http://10.0.2.2:3000/api');
+  /// Client ID de tipo "Aplicación web" de Google Cloud (el mismo valor que GOOGLE_CLIENT_ID del backend).
+  /// Se pasa con --dart-define=GOOGLE_SERVER_CLIENT_ID=xxxx.apps.googleusercontent.com o se pega aquí en defaultValue.
+  static const String googleServerClientId = String.fromEnvironment(
+    'GOOGLE_SERVER_CLIENT_ID',
+    defaultValue: '52252720899-h0qhl954pf716ms3t7kjccfilulf8frh.apps.googleusercontent.com',
+  );
 }
 
 class AppSpacing {

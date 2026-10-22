@@ -265,6 +265,7 @@ class _ProfilePageState extends State<ProfilePage> {
 
   // ---- Acciones ----
   Widget get _acciones => Column(children: [
+        if (_usuario?['rol_id'] == 6) _accion(Icons.admin_panel_settings_outlined, 'Panel de administración', () => Navigator.push(context, MaterialPageRoute(builder: (_) => const AdminPage())), color: AppColors.secondary),
         _accion(Icons.edit_outlined, 'Editar perfil', _editar),
         _accion(Icons.lock_outline, 'Cambiar contraseña', () => Navigator.push(context, MaterialPageRoute(builder: (_) => const ChangePasswordPage()))),
         _accion(Icons.logout, 'Cerrar sesión', _cerrarSesion),

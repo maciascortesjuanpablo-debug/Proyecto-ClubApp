@@ -19,7 +19,7 @@ import notificacionesRoutes from './routes/notificaciones.js';
 import favoritosRoutes from './routes/favoritos.js';
 import scoutIARoutes from './routes/scoutIA.js';
 import homeRoutes from './routes/home.js';
-import adminRoutes from './routes/admin.js';
+import adminRoutes from './routes/admin.js'; 
 
 conectaDB();
 

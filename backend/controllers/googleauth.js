@@ -1,9 +1,11 @@
 import { OAuth2Client } from 'google-auth-library';
 import { usuarioModel } from '../models/usuario.js';
-import { firmarSesion } from '../utils/token.js';
+import { respuestaSesion } from '../utils/token.js';
 import { fallo, normalizarCorreo } from '../utils/helpers.js';
 
-const client = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
+const client = new OAuth2Client();
+// GOOGLE_CLIENT_ID admite varios ids separados por coma (el de tipo "Web" que usa la app como serverClientId, el de iOS, etc.)
+const audiencias = () => (process.env.GOOGLE_CLIENT_ID ?? '').split(',').map((id) => id.trim()).filter(Boolean);
 
 export const autenticarConGoogle = async (req, res) => {
   const { idToken } = req.body;
@@ -14,7 +16,7 @@ export const autenticarConGoogle = async (req, res) => {
   // 1. Validar el token con Google
   let payload;
   try {
-    payload = (await client.verifyIdToken({ idToken, audience: process.env.GOOGLE_CLIENT_ID })).getPayload();
+    payload = (await client.verifyIdToken({ idToken, audience: audiencias() })).getPayload();
   } catch (error) {
     console.error('Token de Google inválido:', error.message);
     return res.status(401).json({ mensaje: 'Token de Google inválido o expirado' });
@@ -50,14 +52,9 @@ export const autenticarConGoogle = async (req, res) => {
       usuario = await usuarioModel.crearGoogle({ nombre, apellido: apellido || 'N/A', correo, googleId, avatar });
     }
 
-    res.json({
-      mensaje: existia ? 'Inicio de sesión exitoso con Google' : 'Registro exitoso con Google',
-      token: firmarSesion(usuario),
-      usuario: {
-        id: usuario.id, nombre: usuario.nombre, apellido: usuario.apellido, correo: usuario.correo,
-        rol_id: usuario.rol_id, avatar: usuario.avatar || avatar,
-      },
-    });
+    const sesion = respuestaSesion(usuario, existia ? 'Inicio de sesión exitoso con Google' : 'Registro exitoso con Google');
+    // `nuevo` le dice a la app que debe pedir el rol (la cuenta nace como "Usuario")
+    res.json({ ...sesion, nuevo: !existia, usuario: { ...sesion.usuario, avatar: usuario.avatar || avatar } });
   } catch (error) {
     fallo(res, error, 'Error al autenticar con Google');
   }

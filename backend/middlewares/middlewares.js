@@ -30,6 +30,7 @@ export const verificarRol = (...rolesPermitidos) => (req, res, next) => {
   next();
 };
 
+
 // El recurso es del propio usuario (req.params[param]) o es Admin
 export const propietarioOAdmin = (param = 'id') => (req, res, next) =>
   esAdmin(req) || esMismoUsuario(req, req.params[param])
@@ -47,4 +48,8 @@ export const adminVigente = async (req, res, next) => {
     console.error('Verificando administrador:', error);
     res.status(500).json({ mensaje: 'Error al verificar permisos' });
   }
+<<<<<<< HEAD
 };
+=======
+};
+>>>>>>> a27ac5cc76426654df467432a6448d2b88dffd42

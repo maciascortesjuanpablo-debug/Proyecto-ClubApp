@@ -30,6 +30,7 @@ class _AdminResumenTabState extends State<AdminResumenTab> with AutomaticKeepAli
     final r = await AdminService.resumen();
     if (!mounted) return;
     setState(() {
+
       _cargando = false;
       _error = r['exito'] == true ? null : r['mensaje'].toString();
       if (r['exito'] == true) _d = r;
@@ -62,6 +63,7 @@ class _AdminResumenTabState extends State<AdminResumenTab> with AutomaticKeepAli
       _fila(
         StatCard(value: '${usuarios['total']}', label: 'Usuarios', subLabel: '+${usuarios['nuevos7d']} esta semana', color: AppColors.success),
         StatCard(value: '${torneos['total']}', label: 'Torneos', subLabel: '${porEstado['Activo'] ?? 0} activos', color: AppColors.primaryLight),
+
       ),
       _fila(
         StatCard(value: '${d['equipos']}', label: 'Equipos', subLabel: 'registrados', color: AppColors.secondary),

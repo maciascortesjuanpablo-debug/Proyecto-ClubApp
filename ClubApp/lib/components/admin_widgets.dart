@@ -31,6 +31,10 @@ class AdminCuerpo extends StatelessWidget {
 
   const AdminCuerpo({super.key, required this.cargando, required this.error, required this.onRefresh, required this.hijos, this.encabezado, this.vacio = 'Sin resultados'});
 
+<<<<<<< HEAD
+=======
+
+>>>>>>> a27ac5cc76426654df467432a6448d2b88dffd42
   @override
   Widget build(BuildContext context) {
     if (cargando) return const Center(child: CircularProgressIndicator());
@@ -62,6 +66,10 @@ class AdminCuerpo extends StatelessWidget {
 class AdminTarjeta extends StatelessWidget {
   final Widget? leading;
   final String titulo;
+<<<<<<< HEAD
+=======
+
+>>>>>>> a27ac5cc76426654df467432a6448d2b88dffd42
   final String? subtitulo;
   final List<Widget> chips;
   final Widget? trailing;
@@ -94,6 +102,10 @@ class AdminTarjeta extends StatelessWidget {
             ),
           ),
         ),
+<<<<<<< HEAD
+=======
+
+>>>>>>> a27ac5cc76426654df467432a6448d2b88dffd42
       );
 }
 
@@ -126,6 +138,10 @@ class FiltroChips<T> extends StatelessWidget {
       );
 }
 
+<<<<<<< HEAD
+=======
+
+>>>>>>> a27ac5cc76426654df467432a6448d2b88dffd42
 /// Gráfico de barras horizontales sencillo (etiqueta, barra, cantidad)
 class AdminBarras extends StatelessWidget {
   final String titulo;
@@ -158,6 +174,10 @@ class AdminBarras extends StatelessWidget {
               ),
               SizedBox(width: 36, child: Text('${e.value}', textAlign: TextAlign.end, style: const TextStyle(fontSize: 12, color: AppColors.textWhite, fontWeight: FontWeight.bold))),
             ]),
+<<<<<<< HEAD
+=======
+
+>>>>>>> a27ac5cc76426654df467432a6448d2b88dffd42
           ),
       ]),
     );

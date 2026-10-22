@@ -1,4 +1,5 @@
 import 'dotenv/config';
+import WebSocket from 'ws';
 import { createClient } from '@supabase/supabase-js';
 
 const supabaseUrl = process.env.SUPABASE_URL;
@@ -10,7 +11,11 @@ if (!supabaseUrl || !supabaseKey) {
   process.exit(1);
 }
 
-export const supabase = createClient(supabaseUrl, supabaseKey, { auth: { persistSession: false } });
+export const supabase = createClient(supabaseUrl, supabaseKey, { auth: { persistSession: false, autoRefreshToken: false },
+  realtime: {
+    transport: WebSocket, // Usar WebSocket para la conexión en tiempo real   
+  }
+});
 
 // Prueba real de conexión
 export const conectaDB = async () => {

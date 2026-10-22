@@ -18,4 +18,3 @@ export const respuestaSesion = (u, mensaje) => ({
   token: firmarSesion(u),
   usuario: { id: u.id, nombre: u.nombre, apellido: u.apellido, correo: u.correo, rol_id: u.rol_id },
 });
-

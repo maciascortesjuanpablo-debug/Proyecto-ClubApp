@@ -30,6 +30,7 @@ export const obtenerUsuarios = async (req, res) => {
 };
 
 export const obtenerUsuarioPorId = async (req, res) => {
+
   try {
     const usuario = await usuarioModel.buscarPorId(req.params.id);
     if (!usuario) return res.status(404).json({ mensaje: 'Usuario no encontrado' });
@@ -62,6 +63,10 @@ export const eliminarUsuario = async (req, res) => {
   }
 };
 
+<<<<<<< HEAD
+=======
+
+>>>>>>> a27ac5cc76426654df467432a6448d2b88dffd42
 // Cambiar la contraseña estando logueado: exige la actual
 export const cambiarPassword = async (req, res) => {
   try {
@@ -94,6 +99,10 @@ export const cambiarPassword = async (req, res) => {
 // Devuelve una sesión nueva porque el rol viaja dentro del token.
 export const elegirRol = async (req, res) => {
   try {
+<<<<<<< HEAD
+=======
+
+>>>>>>> a27ac5cc76426654df467432a6448d2b88dffd42
     const rolId = Number(req.body.rol_id);
     if (!ROLES_REGISTRO.includes(rolId)) return res.status(400).json({ mensaje: 'Rol no permitido' });
 

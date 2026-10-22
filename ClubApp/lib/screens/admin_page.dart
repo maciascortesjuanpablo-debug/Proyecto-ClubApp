@@ -30,6 +30,7 @@ class AdminPage extends StatelessWidget {
           title: const Text('Panel de administración'),
           bottom: const TabBar(
             isScrollable: true,
+
             tabAlignment: TabAlignment.start,
             indicatorColor: AppColors.secondary,
             labelColor: AppColors.textWhite,

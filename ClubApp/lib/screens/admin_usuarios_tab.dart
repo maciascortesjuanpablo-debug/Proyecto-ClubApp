@@ -30,6 +30,10 @@ class _AdminUsuariosTabState extends State<AdminUsuariosTab> with AutomaticKeepA
   @override
   void initState() {
     super.initState();
+<<<<<<< HEAD
+=======
+
+>>>>>>> a27ac5cc76426654df467432a6448d2b88dffd42
     _cargar();
   }
 
@@ -63,6 +67,10 @@ class _AdminUsuariosTabState extends State<AdminUsuariosTab> with AutomaticKeepA
     });
   }
 
+<<<<<<< HEAD
+=======
+
+>>>>>>> a27ac5cc76426654df467432a6448d2b88dffd42
   void _filtrar(VoidCallback cambio) {
     setState(cambio);
     _cargar();
@@ -94,6 +102,10 @@ class _AdminUsuariosTabState extends State<AdminUsuariosTab> with AutomaticKeepA
             hintStyle: const TextStyle(color: AppColors.textGray, fontSize: 13),
             prefixIcon: const Icon(Icons.search, color: AppColors.textGray),
             suffixIcon: IconButton(icon: const Icon(Icons.arrow_forward, color: AppColors.secondary), onPressed: _cargar),
+<<<<<<< HEAD
+=======
+
+>>>>>>> a27ac5cc76426654df467432a6448d2b88dffd42
             filled: true,
             fillColor: AppColors.bgCard,
             contentPadding: const EdgeInsets.symmetric(vertical: 12),
@@ -126,6 +138,10 @@ class _AdminUsuariosTabState extends State<AdminUsuariosTab> with AutomaticKeepA
           Center(
             child: _cargandoMas
                 ? const Padding(padding: EdgeInsets.all(12), child: CircularProgressIndicator())
+<<<<<<< HEAD
+=======
+
+>>>>>>> a27ac5cc76426654df467432a6448d2b88dffd42
                 : TextButton(onPressed: () => _cargar(mas: true), child: const Text('Cargar más', style: TextStyle(color: AppColors.secondary, fontWeight: FontWeight.bold))),
           ),
       ],

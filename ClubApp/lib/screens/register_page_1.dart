@@ -10,7 +10,7 @@ import '../components/divider_with_text.dart';
 import '../components/form_section.dart';
 import '../components/navigation_link.dart';
 import '../components/progress_bar.dart';
-import '../components/social_buttons_row.dart';
+import '../components/google_sign_in_button.dart';
 import 'login_page.dart';
 import 'register_page_2.dart';
 
@@ -99,7 +99,7 @@ class _RegisterPage1State extends State<RegisterPage1> {
                 const SizedBox(height: 16),
                 const DividerWithText(text: 'O regístrate con'),
                 const SizedBox(height: 12),
-                const SocialButtonsRow(),
+                const GoogleSignInButton(),
                 const SizedBox(height: 16),
                 NavigationLink(
                   normalText: '¿Ya tienes cuenta? ',
