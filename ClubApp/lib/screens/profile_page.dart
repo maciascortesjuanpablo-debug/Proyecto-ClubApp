@@ -9,6 +9,7 @@ import '../services/auth_service.dart';
 import '../services/profile_service.dart';
 import 'change_password_page.dart';
 import 'edit_profile_page.dart';
+import 'admin_page.dart';
 
 class ProfilePage extends StatefulWidget {
   const ProfilePage({super.key});
@@ -268,6 +269,7 @@ class _ProfilePageState extends State<ProfilePage> {
         _accion(Icons.lock_outline, 'Cambiar contraseña', () => Navigator.push(context, MaterialPageRoute(builder: (_) => const ChangePasswordPage()))),
         _accion(Icons.logout, 'Cerrar sesión', _cerrarSesion),
         _accion(Icons.delete_outline, 'Eliminar cuenta', _eliminarCuenta, color: AppColors.error),
+        if (_usuario?['rol_id'] == 6) _accion(Icons.admin_panel_settings_outlined, 'Panel de administración', () => Navigator.push(context, MaterialPageRoute(builder: (_) => const AdminPage())), color: AppColors.secondary),
       ]);
 
   Widget _accion(IconData icono, String titulo, VoidCallback onTap, {Color color = AppColors.textWhite}) => Padding(

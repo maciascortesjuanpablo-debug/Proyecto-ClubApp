@@ -1,5 +1,6 @@
 import jwt from 'jsonwebtoken';
-import { esAdmin, esMismoUsuario } from '../utils/helpers.js';
+import { usuarioModel } from '../models/usuario.js';
+import { ROLES, esAdmin, esMismoUsuario } from '../utils/helpers.js';
 
 // Verifica que el usuario esté logueado (token de sesión válido)
 export const verificarToken = (req, res, next) => {
@@ -34,3 +35,16 @@ export const propietarioOAdmin = (param = 'id') => (req, res, next) =>
   esAdmin(req) || esMismoUsuario(req, req.params[param])
     ? next()
     : res.status(403).json({ mensaje: 'No tienes permisos sobre este recurso' });
+
+// Panel de administración: el token dice que es admin, pero se confirma en la base de datos
+// (si lo degradaron o desactivaron, su token ya no sirve aquí aunque no haya vencido)
+export const adminVigente = async (req, res, next) => {
+  try {
+    const usuario = await usuarioModel.buscarPorId(req.usuario.id);
+    if (usuario?.activo && usuario.rol_id === ROLES.ADMIN) return next();
+    res.status(403).json({ mensaje: 'Solo los administradores pueden entrar aquí' });
+  } catch (error) {
+    console.error('Verificando administrador:', error);
+    res.status(500).json({ mensaje: 'Error al verificar permisos' });
+  }
+};
