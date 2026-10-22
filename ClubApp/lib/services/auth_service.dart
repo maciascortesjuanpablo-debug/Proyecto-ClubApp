@@ -1,11 +1,18 @@
 import 'dart:convert';
+import 'package:flutter/foundation.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
+import 'package:google_sign_in/google_sign_in.dart';
 import 'package:http/http.dart' as http;
 import '../core/app_constants.dart';
 
 class AuthService {
   // El token se guarda cifrado (Keystore en Android, Keychain en iOS)
   static const _storage = FlutterSecureStorage();
+
+  static final _google = GoogleSignIn(
+    scopes: const ['email', 'profile'],
+    serverClientId: AppConfig.googleServerClientId.isEmpty ? null : AppConfig.googleServerClientId,
+  );
 
   static String? _token;
   static Map<String, dynamic>? _usuario;
@@ -23,6 +30,7 @@ class AuthService {
       if (token == null || usuario == null || _vencido(token)) {
         await logout();
         return;
+
       }
       _token = token;
       _usuario = jsonDecode(usuario) as Map<String, dynamic>;
@@ -55,6 +63,7 @@ class AuthService {
             Uri.parse('${AppConfig.apiUrl}$ruta'),
             headers: {'Content-Type': 'application/json', if (conSesion && _token != null) 'Authorization': 'Bearer $_token'},
             body: jsonEncode(cuerpo),
+
           )
           .timeout(const Duration(seconds: 15));
       final data = jsonDecode(r.body) as Map<String, dynamic>;
@@ -87,6 +96,7 @@ class AuthService {
           'password': password,
           'rol_id': rolId,
           'nivel_juego': nivelJuego,
+
         },
         ok: 201,
         errorPorDefecto: 'Error al registrar',
@@ -108,6 +118,36 @@ class AuthService {
   static Future<Map<String, dynamic>> reenviarDosPasos({required String tokenDesafio}) =>
       _post('/auth/reenviar-2fa', {'tokenDesafio': tokenDesafio}, errorPorDefecto: 'No se pudo reenviar el código');
 
+  /// Abre el selector de cuentas de Google y entra con el token de identidad (el backend lo valida con Google).
+  /// Devuelve {exito, nuevo, cancelado, mensaje}. `nuevo` = la cuenta se acaba de crear.
+  static Future<Map<String, dynamic>> iniciarSesionConGoogle() async {
+    if (AppConfig.googleServerClientId.isEmpty) {
+      return {'exito': false, 'mensaje': 'Falta configurar GOOGLE_SERVER_CLIENT_ID para entrar con Google'};
+    }
+    try {
+      await _google.signOut(); // así siempre muestra el selector de cuentas
+      final cuenta = await _google.signIn();
+      if (cuenta == null) return {'exito': false, 'cancelado': true}; // cerró el selector
+
+
+      final idToken = (await cuenta.authentication).idToken;
+      if (idToken == null) return {'exito': false, 'mensaje': 'Google no entregó el token de identidad. Revisa el cliente OAuth en Google Cloud'};
+
+      final r = await _post('/auth/google', {'idToken': idToken}, errorPorDefecto: 'No se pudo iniciar sesión con Google');
+      return r['exito'] == true ? await _abrirSesion(r) : r;
+    } catch (e) {
+      // ApiException 10 = SHA-1 o nombre de paquete no coinciden; 12500 = falta configurar la pantalla de consentimiento
+      debugPrint('Google Sign-In: $e');
+      return {'exito': false, 'mensaje': 'No se pudo conectar con Google. Revisa la configuración (SHA-1, nombre de paquete y client ID)'};
+    }
+  }
+
+  /// Quien entró con Google nace como "Usuario" y elige su rol una sola vez. El backend devuelve un token nuevo con ese rol.
+  static Future<Map<String, dynamic>> elegirRol(int rolId) async {
+    final r = await _post('/usuarios/elegir-rol', {'rol_id': rolId}, conSesion: true, errorPorDefecto: 'No se pudo guardar el rol');
+    return r['exito'] == true ? await _abrirSesion(r) : r;
+  }
+
   static Future<Map<String, dynamic>> _abrirSesion(Map<String, dynamic> r) async {
     _token = r['token'] as String;
     _usuario = r['usuario'] as Map<String, dynamic>;
@@ -123,12 +163,14 @@ class AuthService {
     await _storage.write(key: 'usuario', value: jsonEncode(_usuario));
   }
 
+
   static Future<void> logout() async {
     _token = null;
     _usuario = null;
     try {
       await _storage.delete(key: 'token');
       await _storage.delete(key: 'usuario');
+      await _google.signOut(); // cierra también la cuenta de Google para que la próxima vez pida elegir
     } catch (_) {}
   }
 

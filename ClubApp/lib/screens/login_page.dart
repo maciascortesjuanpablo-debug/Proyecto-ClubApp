@@ -8,7 +8,7 @@ import '../components/app_header.dart';
 import '../components/app_text_field.dart';
 import '../components/divider_with_text.dart';
 import '../components/navigation_link.dart';
-import '../components/social_buttons_row.dart';
+import '../components/google_sign_in_button.dart';
 import '../components/success_dialog.dart';
 import '../services/auth_service.dart';
 import 'forgot_password_page.dart';
@@ -106,7 +106,7 @@ if (resultado['requiere2fa'] == true) {
                 const SizedBox(height: 24),
                 const DividerWithText(text: 'O continúa con'),
                 const SizedBox(height: 16),
-                const SocialButtonsRow(),
+                const GoogleSignInButton(),
                 const SizedBox(height: 24),
                 NavigationLink(normalText: '¿No tienes cuenta? ', actionText: 'Regístrate', onTap: () => _ir(const RegisterPage1())),
                 const SizedBox(height: 12),
