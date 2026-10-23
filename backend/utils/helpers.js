@@ -37,3 +37,15 @@ export const entero = (v, min = 0, max = 1_000_000) => {
 };
 export const FECHA_RE = /^\d{4}-\d{2}-\d{2}$/;
 export const HORA_RE = /^([01]\d|2[0-3]):[0-5]\d(:[0-5]\d)?$/;
+
+// Zona horaria para decidir qué es "hoy" y "ahora" (el servidor suele estar en UTC). Se puede cambiar con ZONA_HORARIA en el .env
+export const ZONA_HORARIA = process.env.ZONA_HORARIA || 'America/Bogota';
+
+// Fecha (AAAA-MM-DD) y hora (HH:MM) actuales en esa zona
+export const ahora = () => {
+  const partes = new Intl.DateTimeFormat('en-CA', {
+    timeZone: ZONA_HORARIA, year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', hourCycle: 'h23',
+  }).formatToParts(new Date());
+  const dato = (tipo) => partes.find((p) => p.type === tipo).value;
+  return { fecha: `${dato('year')}-${dato('month')}-${dato('day')}`, hora: `${dato('hour')}:${dato('minute')}` };
+};

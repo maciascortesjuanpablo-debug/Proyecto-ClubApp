@@ -2,7 +2,7 @@ import { supabase } from '../config/supabase.js';
 import { calendarioModel } from '../models/calendario.js';
 import { torneoModel } from '../models/torneos.js';
 import { inscripcionModel } from '../models/inscripciones.js';
-import { FECHA_RE, HORA_RE, ROLES, datos, entero, esAdmin, fallo, pick, texto } from '../utils/helpers.js';
+import { FECHA_RE, HORA_RE, ROLES, ahora, datos, entero, esAdmin, fallo, pick, texto } from '../utils/helpers.js';
 import { esOrganizadorTorneo } from '../utils/permisos.js';
 import { recalcularSeguro } from '../utils/posiciones.js';
 
@@ -36,7 +36,14 @@ const conTorneo = async (lista) => {
   const porId = Object.fromEntries(torneos.map((t) => [t.id, t]));
   return lista.map((e) => ({ ...e, torneo: porId[e.torneo_id] ?? null }));
 };
-
+// El calendario solo programa hacia adelante: nada en días pasados ni en una hora de hoy que ya pasó.
+// Devuelve el mensaje de error o null.
+const errorDePasado = (fecha, hora) => {
+  const hoy = ahora();
+  if (fecha < hoy.fecha) return 'No se pueden programar eventos en fechas pasadas';
+  if (fecha === hoy.fecha && String(hora).slice(0, 5) <= hoy.hora) return 'Esa hora de hoy ya pasó, elige una hora posterior';
+  return null;
+};
 // Un partido necesita dos equipos distintos y aceptados en el torneo. Devuelve el mensaje de error o null
 const validarPartido = async (torneo_id, local, visitante) => {
   if (!local || !visitante || String(local) === String(visitante)) return 'Un partido necesita dos equipos distintos';
@@ -172,6 +179,13 @@ export const crearEvento = async (req, res) => {
     if (!FECHA_RE.test(fecha) || !HORA_RE.test(hora)) {
       return res.status(400).json({ mensaje: 'La fecha debe ser AAAA-MM-DD y la hora HH:MM' });
     }
+        if (!FECHA_RE.test(fecha) || !HORA_RE.test(hora)) {
+      return res.status(400).json({ mensaje: 'La fecha debe ser AAAA-MM-DD y la hora HH:MM' });
+    }
+    const pasado = errorDePasado(fecha, hora);
+    if (pasado) return res.status(400).json({ mensaje: pasado });
+    if (!(await torneoGestionable(req, res, torneo_id))) return;
+
     if (!(await torneoGestionable(req, res, torneo_id))) return;
 
     if (tipo === 'Partido') {
@@ -226,6 +240,14 @@ export const actualizarEvento = async (req, res) => {
 
     // Si cambia la agenda o los equipos, se revisan de nuevo las reglas con los datos ya combinados
     const final = { ...req.evento, ...cambios };
+    // Solo se revisa si realmente se mueve la fecha u hora (editar un evento ya pasado, p. ej. su sede, sigue permitido)
+    const dia = (f) => String(f).split('T')[0];
+    const movido = dia(final.fecha) !== dia(req.evento.fecha) || String(final.hora).slice(0, 5) !== String(req.evento.hora).slice(0, 5);
+    if (movido) {
+      const pasado = errorDePasado(dia(final.fecha), final.hora);
+      if (pasado) return res.status(400).json({ mensaje: pasado });
+    }
+
     if (CAMPOS_AGENDA.some((c) => c in cambios)) {
       if (final.tipo === 'Partido') {
 

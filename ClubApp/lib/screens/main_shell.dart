@@ -4,8 +4,7 @@ import '../components/nav_bar.dart';
 import 'home_page.dart';
 import 'profile_page.dart';
 import 'scout_page.dart';
-import 'tournaments_page.dart';
-import 'coming_soon_page.dart';
+import 'tournaments_page.dart'; 
 import 'calendar_page.dart';
 
 class MainShell extends StatefulWidget {

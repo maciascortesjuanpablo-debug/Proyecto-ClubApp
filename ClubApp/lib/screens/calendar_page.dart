@@ -59,6 +59,10 @@ class _CalendarPageState extends State<CalendarPage> {
   }
 
   Future<void> _nuevoEvento() async {
+    if (diaPasado(_dia)) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('No se pueden programar eventos en fechas pasadas. Elige hoy o un día futuro.')));
+      return;
+    }
     final creado = await Navigator.push<bool>(context, MaterialPageRoute(builder: (_) => EventFormPage(fechaInicial: _dia)));
     if (creado == true && mounted) _cargar();
   }
@@ -82,7 +86,7 @@ class _CalendarPageState extends State<CalendarPage> {
       floatingActionButton: puedeCrearEventos
           ? FloatingActionButton.extended(
               onPressed: _nuevoEvento,
-              backgroundColor: AppColors.blue,
+              backgroundColor: diaPasado(_dia) ? AppColors.bgCardLight : AppColors.blue, // atenuado si el día elegido ya pasó
               foregroundColor: AppColors.textWhite,
               icon: const Icon(Icons.add),
               label: const Text('Nuevo evento', style: TextStyle(fontWeight: FontWeight.bold)),

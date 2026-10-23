@@ -126,7 +126,7 @@ class _CreateTournamentPageState extends State<CreateTournamentPage> {
           Align(
             alignment: Alignment.centerLeft,
             child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-              const Text('Departamento (opcional)', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: AppColors.textWhite)),
+              const Text('Departamento', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: AppColors.textWhite)),
               const SizedBox(height: 10),
               CityDropdown(selectedCity: _ciudad, onChanged: (c) => setState(() => _ciudad = c)),
 

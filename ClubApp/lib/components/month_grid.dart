@@ -2,7 +2,8 @@ import 'package:flutter/material.dart';
 import '../core/app_colors.dart';
 import '../core/calendar_utils.dart';
 
-/// Cuadrícula de un mes (semana desde el lunes). Marca los días con eventos con puntos.
+/// Cuadrícula de un mes (semana desde el lunes). Marca los días con eventos con puntos; los días pasados se ven atenuados
+/// (se pueden abrir para consultar resultados, pero no admiten crear eventos).
 class MonthGrid extends StatelessWidget {
   final DateTime mes; // cualquier día del mes a mostrar
   final DateTime seleccionado;
@@ -29,6 +30,7 @@ class MonthGrid extends StatelessWidget {
           for (var i = 0; i < celdas; i++)
             (i < desfase || i >= desfase + dias) ? const SizedBox.shrink() : _celda(DateTime(mes.year, mes.month, i - desfase + 1), hoy),
         ],
+
       ),
     ]);
   }
@@ -36,6 +38,7 @@ class MonthGrid extends StatelessWidget {
   Widget _celda(DateTime dia, DateTime hoy) {
     final elegido = DateUtils.isSameDay(dia, seleccionado);
     final esHoy = DateUtils.isSameDay(dia, hoy);
+    final pasado = diaPasado(dia);
     final cantidad = eventosPorDia[isoFecha(dia)] ?? 0;
     return GestureDetector(
       onTap: () => onSeleccionar(dia),
@@ -47,11 +50,11 @@ class MonthGrid extends StatelessWidget {
           border: esHoy && !elegido ? Border.all(color: AppColors.secondary) : null,
         ),
         child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
-          Text('${dia.day}', style: TextStyle(fontSize: 14, color: AppColors.textWhite, fontWeight: elegido || esHoy ? FontWeight.bold : FontWeight.w500)),
+          Text('${dia.day}', style: TextStyle(fontSize: 14, color: pasado && !elegido ? AppColors.textGrayDark : AppColors.textWhite, fontWeight: elegido || esHoy ? FontWeight.bold : FontWeight.w500)),
           const SizedBox(height: 3),
           Row(mainAxisAlignment: MainAxisAlignment.center, children: [
             for (var k = 0; k < (cantidad > 3 ? 3 : cantidad); k++)
-              Container(width: 5, height: 5, margin: const EdgeInsets.symmetric(horizontal: 1), decoration: BoxDecoration(color: elegido ? AppColors.textWhite : AppColors.success, shape: BoxShape.circle)),
+              Container(width: 5, height: 5, margin: const EdgeInsets.symmetric(horizontal: 1), decoration: BoxDecoration(color: elegido ? AppColors.textWhite : (pasado ? AppColors.textGrayDark : AppColors.success), shape: BoxShape.circle)),
           ]),
         ]),
       ),

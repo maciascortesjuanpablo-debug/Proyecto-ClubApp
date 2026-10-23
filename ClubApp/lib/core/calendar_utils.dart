@@ -27,6 +27,12 @@ String horaCorta(dynamic h) {
 /// "jueves 5 de noviembre"
 String fechaLarga(DateTime d) => '${_nombresDia[d.weekday - 1]} ${d.day} de ${nombresMes[d.month - 1]}';
 
+/// ¿El día es anterior a hoy? (esos días no admiten crear eventos)
+bool diaPasado(DateTime d) => DateUtils.dateOnly(d).isBefore(DateUtils.dateOnly(DateTime.now()));
+
+/// ¿Esa fecha y hora ya pasaron? La hora actual cuenta como pasada.
+bool enElPasado(DateTime fecha, TimeOfDay hora) => !DateTime(fecha.year, fecha.month, fecha.day, hora.hour, hora.minute).isAfter(DateTime.now());
+
 Color colorEstadoPartido(String estado) => switch (estado) {
       'En vivo' => AppColors.success,
       'Finalizado' => AppColors.textGrayDark,

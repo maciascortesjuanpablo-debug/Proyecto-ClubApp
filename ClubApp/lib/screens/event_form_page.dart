@@ -26,8 +26,11 @@ class _EventFormPageState extends State<EventFormPage> {
   Object? _localId;
   Object? _visitanteId;
   Object? _sedeId;
+  DateTime? _fechaOriginal; // al editar: para validar solo si se mueve la fecha u hora
+  TimeOfDay? _horaOriginal;
   String _tipo = 'Partido';
   DateTime? _fecha;
+
   TimeOfDay? _hora;
   bool _cargando = true;
   bool _guardando = false;
@@ -49,6 +52,8 @@ class _EventFormPageState extends State<EventFormPage> {
       _localId = e['equipo_local_id'] as Object?;
       _visitanteId = e['equipo_visitante_id'] as Object?;
       _sedeId = e['lugar_id'] as Object?;
+      _fechaOriginal = _fecha;
+      _horaOriginal = _hora;
       if (_torneoId != null) _torneos = {_torneoId!: (e['torneo']?['nombre'] ?? 'Torneo').toString()};
     } else {
       _fecha = widget.fechaInicial;
@@ -58,6 +63,7 @@ class _EventFormPageState extends State<EventFormPage> {
     if (!mounted) return;
     setState(() {
       if (!_edicion && r[0]['exito'] == true) {
+
         _torneos = {for (final t in (r[0]['datos'] as List).cast<Map<String, dynamic>>()) t['id'] as Object: t['nombre'].toString()};
       }
       if (r[1]['exito'] == true) _sedes = {for (final s in (r[1]['datos'] as List).cast<Map<String, dynamic>>()) s['id'] as Object: s['nombre'].toString()};
@@ -81,14 +87,20 @@ class _EventFormPageState extends State<EventFormPage> {
 
   String _hhmm(TimeOfDay h) => '${h.hour.toString().padLeft(2, '0')}:${h.minute.toString().padLeft(2, '0')}';
 
+  // Solo se puede programar de hoy en adelante: los días anteriores aparecen deshabilitados en el selector
   Future<void> _elegirFecha() async {
-    final f = await showDatePicker(context: context, initialDate: _fecha ?? DateTime.now(), firstDate: DateTime(2020), lastDate: DateTime(2100));
+    final hoy = DateUtils.dateOnly(DateTime.now());
+    final inicial = (_fecha != null && !_fecha!.isBefore(hoy)) ? _fecha! : hoy;
+    final f = await showDatePicker(context: context, initialDate: inicial, firstDate: hoy, lastDate: DateTime(hoy.year + 5), helpText: 'Elige una fecha desde hoy');
     if (f != null) setState(() => _fecha = f);
   }
 
   Future<void> _elegirHora() async {
+
     final h = await showTimePicker(context: context, initialTime: _hora ?? const TimeOfDay(hour: 16, minute: 0));
-    if (h != null) setState(() => _hora = h);
+    if (h == null) return;
+    if (_fecha != null && enElPasado(_fecha!, h)) return _aviso('Esa hora de hoy ya pasó, elige una hora posterior');
+    setState(() => _hora = h);
   }
 
   Future<void> _nuevaSede() async {
@@ -117,6 +129,7 @@ class _EventFormPageState extends State<EventFormPage> {
     if (!mounted) return;
     if (r['exito'] != true) return _aviso(r['mensaje'].toString());
     final sede = r['sede'] as Map<String, dynamic>;
+
     setState(() {
       _sedes = {..._sedes, sede['id'] as Object: sede['nombre'].toString()};
       _sedeId = sede['id'] as Object;
@@ -127,6 +140,10 @@ class _EventFormPageState extends State<EventFormPage> {
     final partido = _tipo == 'Partido';
     if (!_edicion && _torneoId == null) return _aviso('Elige el torneo');
     if (_fecha == null || _hora == null) return _aviso('Elige la fecha y la hora');
+    // Al editar solo se revisa si se movió la fecha u hora (un evento pasado puede cambiar de sede sin moverlo)
+    final movido = !_edicion || !DateUtils.isSameDay(_fecha, _fechaOriginal) || _hora != _horaOriginal;
+    if (movido && diaPasado(_fecha!)) return _aviso('No se pueden programar eventos en fechas pasadas');
+    if (movido && enElPasado(_fecha!, _hora!)) return _aviso('Esa hora de hoy ya pasó, elige una hora posterior');
     if (partido && (_localId == null || _visitanteId == null)) return _aviso('Elige los dos equipos');
     if (partido && _localId.toString() == _visitanteId.toString()) return _aviso('Los equipos deben ser distintos');
 
@@ -144,6 +161,7 @@ class _EventFormPageState extends State<EventFormPage> {
     setState(() => _guardando = false);
     _aviso(r['mensaje'].toString()); // p. ej. "Esa sede ya está ocupada a esa hora"
   }
+
 
   Widget _etiqueta(String t) => Padding(padding: const EdgeInsets.only(bottom: 10), child: Text(t, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: AppColors.textWhite)));
 
@@ -177,6 +195,7 @@ class _EventFormPageState extends State<EventFormPage> {
                     _selector('Torneo', Icons.emoji_events_outlined, _torneos.values.firstOrNull ?? '-', () {})
                   else if (_torneos.isEmpty)
                     const Text('No tienes torneos donde crear eventos. Crea un torneo primero.', textAlign: TextAlign.center, style: TextStyle(color: AppColors.textGray))
+
                   else
                     AppDropdown<Object>(
                       label: 'Torneo',
@@ -209,6 +228,7 @@ class _EventFormPageState extends State<EventFormPage> {
                   Align(alignment: Alignment.centerRight, child: TextButton.icon(onPressed: _nuevaSede, icon: const Icon(Icons.add, size: 18), label: const Text('Nueva sede'))),
                   const SizedBox(height: 16),
                   AppButton(label: _edicion ? 'Guardar cambios' : 'Crear evento', isLoading: _guardando, backgroundColor: AppColors.blue, onPressed: _guardar),
+
                 ]),
               ),
             ),
