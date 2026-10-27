@@ -8,6 +8,7 @@ import { recalcularSeguro } from '../utils/posiciones.js';
 
 const ESTADOS = ['Programado', 'En vivo', 'Finalizado', 'Aplazado', 'Cancelado'];
 const CAMPOS_AGENDA = ['fecha', 'hora', 'lugar_id', 'equipo_local_id', 'equipo_visitante_id'];
+const DIAS_VENTANA = 40; // ventana móvil: hoy + 39 = 40 días en total
 
 /* ---------- utilidades ---------- */
 
@@ -36,14 +37,24 @@ const conTorneo = async (lista) => {
   const porId = Object.fromEntries(torneos.map((t) => [t.id, t]));
   return lista.map((e) => ({ ...e, torneo: porId[e.torneo_id] ?? null }));
 };
-// El calendario solo programa hacia adelante: nada en días pasados ni en una hora de hoy que ya pasó.
+
+// Suma días a una fecha 'AAAA-MM-DD' sin depender de la zona horaria del servidor
+const sumarDias = (fecha, dias) => {
+  const [a, m, d] = fecha.split('-').map(Number);
+  return new Date(Date.UTC(a, m - 1, d + dias)).toISOString().slice(0, 10);
+};
+
+// El calendario solo programa dentro de la ventana móvil de 40 días:
+// nada en días pasados, nada en una hora de hoy que ya pasó y nada más allá de hoy + 39.
 // Devuelve el mensaje de error o null.
 const errorDePasado = (fecha, hora) => {
   const hoy = ahora();
   if (fecha < hoy.fecha) return 'No se pueden programar eventos en fechas pasadas';
+  if (fecha > sumarDias(hoy.fecha, DIAS_VENTANA - 1)) return `Solo se pueden programar eventos dentro de los próximos ${DIAS_VENTANA} días`;
   if (fecha === hoy.fecha && String(hora).slice(0, 5) <= hoy.hora) return 'Esa hora de hoy ya pasó, elige una hora posterior';
   return null;
 };
+
 // Un partido necesita dos equipos distintos y aceptados en el torneo. Devuelve el mensaje de error o null
 const validarPartido = async (torneo_id, local, visitante) => {
   if (!local || !visitante || String(local) === String(visitante)) return 'Un partido necesita dos equipos distintos';
@@ -103,7 +114,6 @@ export const crearSede = async (req, res) => {
   }
 };
 
-
 export const obtenerSedes = async (req, res) => {
   try {
     res.json(await calendarioModel.listarSedes());
@@ -137,7 +147,6 @@ export const misEventos = async (req, res) => {
       return res.json({ eventos: await conTorneo(todos.map((e) => ({ ...e, relacion: ['admin'] }))) });
     }
 
-
     const uid = req.usuario.id;
     const [equipos, arbitrajes, torneos] = await Promise.all([
       equiposDelUsuario(uid),
@@ -169,7 +178,6 @@ export const misEventos = async (req, res) => {
 
 export const crearEvento = async (req, res) => {
   try {
-
     const { torneo_id, equipo_local_id, equipo_visitante_id, lugar_id } = req.body;
     const tipo = texto(req.body.tipo, 30);
     const { fecha, hora } = req.body;
@@ -179,13 +187,8 @@ export const crearEvento = async (req, res) => {
     if (!FECHA_RE.test(fecha) || !HORA_RE.test(hora)) {
       return res.status(400).json({ mensaje: 'La fecha debe ser AAAA-MM-DD y la hora HH:MM' });
     }
-        if (!FECHA_RE.test(fecha) || !HORA_RE.test(hora)) {
-      return res.status(400).json({ mensaje: 'La fecha debe ser AAAA-MM-DD y la hora HH:MM' });
-    }
     const pasado = errorDePasado(fecha, hora);
     if (pasado) return res.status(400).json({ mensaje: pasado });
-    if (!(await torneoGestionable(req, res, torneo_id))) return;
-
     if (!(await torneoGestionable(req, res, torneo_id))) return;
 
     if (tipo === 'Partido') {
@@ -209,7 +212,6 @@ export const obtenerEventosPorTorneo = async (req, res) => {
     fallo(res, error, 'Error al obtener los eventos');
   }
 };
-
 
 // Detalle: el evento con su torneo (para saber quién lo organiza) y sus árbitros
 export const obtenerEventoPorId = async (req, res) => {
@@ -250,7 +252,6 @@ export const actualizarEvento = async (req, res) => {
 
     if (CAMPOS_AGENDA.some((c) => c in cambios)) {
       if (final.tipo === 'Partido') {
-
         const error = await validarPartido(final.torneo_id, final.equipo_local_id, final.equipo_visitante_id);
         if (error) return res.status(400).json({ mensaje: error });
       }
@@ -283,7 +284,6 @@ export const registrarResultado = async (req, res) => {
       if (cambios[c] != null && (cambios[c] = entero(cambios[c], 0, 99)) === null) {
         return res.status(400).json({ mensaje: 'Los resultados deben ser enteros entre 0 y 99' });
       }
-
     }
 
     const final = { ...evento, ...cambios };
@@ -316,7 +316,6 @@ export const arbitrosDisponibles = async (req, res) => {
   try {
     const arbitros = datos(await supabase.from('usuarios').select('id, nombre, apellido').eq('rol_id', ROLES.ARBITRO).eq('activo', true).order('nombre').limit(200));
     res.json({ arbitros });
-
   } catch (error) {
     fallo(res, error, 'Error al obtener los árbitros');
   }
@@ -349,7 +348,6 @@ export const quitarArbitro = async (req, res) => {
 
 export const obtenerArbitrosPorEvento = async (req, res) => {
   try {
-
     res.json(await calendarioModel.listarArbitrosPorEvento(req.params.id));
   } catch (error) {
     fallo(res, error, 'Error al obtener los árbitros');

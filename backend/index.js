@@ -28,10 +28,14 @@ const app = express();
 if (process.env.TRUST_PROXY) app.set('trust proxy', Number(process.env.TRUST_PROXY));
 app.use(helmet());
 app.use(cors());
+
+// Rutas de salud para el monitor: van ANTES del límite de peticiones
+// para que los chequeos frecuentes nunca reciban un 429
+app.get('/', (req, res) => res.status(200).json({ estado: 'ok' }));
+app.get('/health', (req, res) => res.status(200).send('OK'));
+
 app.use(express.json({ limit: '100kb' }));
 app.use(limiteGeneral);
-
-app.get('/api/salud', (req, res) => res.json({ ok: true }));
 
 const rutas = {
   auth: authRoutes,
