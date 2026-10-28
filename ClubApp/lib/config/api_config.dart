@@ -6,7 +6,7 @@ class ApiConfig {
 
   // URL del backend Node.js / Express
   static const String _remoteUrl =
-      'https://clubapp-ups7.onrender.com/';
+      'https://clubapp-ups7.onrender.com';
 
   // URL base para todas las peticiones
   static String get baseUrl {
