@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import '../core/app_colors.dart';
 import '../core/calendar_utils.dart';
@@ -17,7 +18,7 @@ class CalendarPage extends StatefulWidget {
   State<CalendarPage> createState() => _CalendarPageState();
 }
 
-class _CalendarPageState extends State<CalendarPage> {
+class _CalendarPageState extends State<CalendarPage> with WidgetsBindingObserver {
   late DateTime _mes = DateTime(DateTime.now().year, DateTime.now().month);
   DateTime _dia = DateUtils.dateOnly(DateTime.now());
   bool _mios = false;
@@ -25,10 +26,36 @@ class _CalendarPageState extends State<CalendarPage> {
   bool _cargando = true;
   String? _error;
 
+  // Para detectar el cambio de día y refrescar la ventana de 40 días automáticamente
+  late DateTime _hoy = DateUtils.dateOnly(DateTime.now());
+  Timer? _timerDia;
+
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
+    _timerDia = Timer.periodic(const Duration(minutes: 1), (_) => _revisarCambioDeDia());
     _cargar();
+  }
+
+  @override
+  void dispose() {
+    _timerDia?.cancel();
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) _revisarCambioDeDia();
+  }
+
+  /// Si cambió el día, se redibuja y el límite de 40 días se corre solo
+  void _revisarCambioDeDia() {
+    final hoy = DateUtils.dateOnly(DateTime.now());
+    if (hoy != _hoy && mounted) {
+      setState(() => _hoy = hoy);
+    }
   }
 
   Future<void> _cargar() async {
@@ -63,6 +90,10 @@ class _CalendarPageState extends State<CalendarPage> {
       ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('No se pueden programar eventos en fechas pasadas. Elige hoy o un día futuro.')));
       return;
     }
+    if (diaFueraDeRango(_dia)) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Solo se pueden programar eventos dentro de los próximos $diasVentanaEventos días.')));
+      return;
+    }
     final creado = await Navigator.push<bool>(context, MaterialPageRoute(builder: (_) => EventFormPage(fechaInicial: _dia)));
     if (creado == true && mounted) _cargar();
   }
@@ -75,6 +106,7 @@ class _CalendarPageState extends State<CalendarPage> {
   @override
   Widget build(BuildContext context) {
     final delDia = _porDia[isoFecha(_dia)] ?? [];
+    final bloqueado = diaBloqueado(_dia);
     return Scaffold(
       backgroundColor: AppColors.bgDark,
       appBar: AppBar(
@@ -86,7 +118,7 @@ class _CalendarPageState extends State<CalendarPage> {
       floatingActionButton: puedeCrearEventos
           ? FloatingActionButton.extended(
               onPressed: _nuevoEvento,
-              backgroundColor: diaPasado(_dia) ? AppColors.bgCardLight : AppColors.blue, // atenuado si el día elegido ya pasó
+              backgroundColor: bloqueado ? AppColors.bgCardLight : AppColors.blue, // atenuado si el día está pasado o fuera de los 40 días
               foregroundColor: AppColors.textWhite,
               icon: const Icon(Icons.add),
               label: const Text('Nuevo evento', style: TextStyle(fontWeight: FontWeight.bold)),
@@ -117,6 +149,15 @@ class _CalendarPageState extends State<CalendarPage> {
             ),
             const SizedBox(height: 12),
             MonthGrid(mes: _mes, seleccionado: _dia, eventosPorDia: {for (final e in _porDia.entries) e.key: e.value.length}, onSeleccionar: (d) => setState(() => _dia = d)),
+            if (bloqueado && puedeCrearEventos)
+              Padding(
+                padding: const EdgeInsets.only(top: 8),
+                child: Text(
+                  diaPasado(_dia) ? 'No se pueden crear eventos en fechas pasadas' : 'Solo se pueden crear eventos hasta el ${fechaLarga(limiteEventos)}',
+                  textAlign: TextAlign.center,
+                  style: const TextStyle(fontSize: 12, color: AppColors.textGray),
+                ),
+              ),
             const Divider(color: AppColors.bgCardLight, height: 28),
             Text(fechaLarga(_dia), style: const TextStyle(fontSize: 16, color: AppColors.textWhite, fontWeight: FontWeight.bold)),
             const SizedBox(height: 4),

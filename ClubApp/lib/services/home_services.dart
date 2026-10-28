@@ -1,6 +1,6 @@
 import 'dart:convert';
 import 'package:http/http.dart' as http;
-import '../core/app_constants.dart';
+import '../config/api_config.dart';
 import 'auth_service.dart';
 
 class HomeService {
@@ -9,7 +9,7 @@ class HomeService {
     try {
       final logueado = AuthService.isLoggedIn;
       final response = await http.get(
-        Uri.parse('${AppConfig.apiUrl}/home${logueado ? '' : '/publico'}'),
+        Uri.parse('${ApiConfig.baseUrl}/home${logueado ? '' : '/publico'}'),
         headers: {
           'Content-Type': 'application/json',
           if (logueado) 'Authorization': 'Bearer ${AuthService.token}',

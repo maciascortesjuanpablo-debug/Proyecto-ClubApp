@@ -1,6 +1,6 @@
 import 'dart:convert';
 import 'package:http/http.dart' as http;
-import '../core/app_constants.dart';
+import '../config/api_config.dart'; 
 import 'auth_service.dart';
 
 /// Petición autenticada genérica al backend.
@@ -8,7 +8,7 @@ import 'auth_service.dart';
 class ApiClient {
   static Future<Map<String, dynamic>> pedir(String metodo, String ruta, {Map<String, dynamic>? cuerpo}) async {
     try {
-      final uri = Uri.parse('${AppConfig.apiUrl}$ruta');
+      final uri = Uri.parse('${ApiConfig.baseUrl}$ruta');
       final headers = {'Content-Type': 'application/json', 'Authorization': 'Bearer ${AuthService.token}'};
       final peticion = switch (metodo) {
         'POST' => http.post(uri, headers: headers, body: jsonEncode(cuerpo)),

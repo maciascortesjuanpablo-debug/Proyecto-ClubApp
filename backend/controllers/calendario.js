@@ -8,7 +8,6 @@ import { recalcularSeguro } from '../utils/posiciones.js';
 
 const ESTADOS = ['Programado', 'En vivo', 'Finalizado', 'Aplazado', 'Cancelado'];
 const CAMPOS_AGENDA = ['fecha', 'hora', 'lugar_id', 'equipo_local_id', 'equipo_visitante_id'];
-const DIAS_VENTANA = 40; // ventana móvil: hoy + 39 = 40 días en total
 
 /* ---------- utilidades ---------- */
 
@@ -31,26 +30,17 @@ const rango = ({ desde, hasta }) => {
 // Agrega a cada evento los datos de su torneo (nombre y organizador)
 const conTorneo = async (lista) => {
   const ids = [...new Set(lista.map((e) => e.torneo_id).filter(Boolean))];
-
   if (!ids.length) return lista;
   const torneos = datos(await supabase.from('torneos').select('id, nombre, organizador_id').in('id', ids));
   const porId = Object.fromEntries(torneos.map((t) => [t.id, t]));
   return lista.map((e) => ({ ...e, torneo: porId[e.torneo_id] ?? null }));
 };
 
-// Suma días a una fecha 'AAAA-MM-DD' sin depender de la zona horaria del servidor
-const sumarDias = (fecha, dias) => {
-  const [a, m, d] = fecha.split('-').map(Number);
-  return new Date(Date.UTC(a, m - 1, d + dias)).toISOString().slice(0, 10);
-};
-
-// El calendario solo programa dentro de la ventana móvil de 40 días:
-// nada en días pasados, nada en una hora de hoy que ya pasó y nada más allá de hoy + 39.
+// El calendario solo programa hacia adelante: nada en días pasados ni en una hora de hoy que ya pasó.
 // Devuelve el mensaje de error o null.
 const errorDePasado = (fecha, hora) => {
   const hoy = ahora();
   if (fecha < hoy.fecha) return 'No se pueden programar eventos en fechas pasadas';
-  if (fecha > sumarDias(hoy.fecha, DIAS_VENTANA - 1)) return `Solo se pueden programar eventos dentro de los próximos ${DIAS_VENTANA} días`;
   if (fecha === hoy.fecha && String(hora).slice(0, 5) <= hoy.hora) return 'Esa hora de hoy ya pasó, elige una hora posterior';
   return null;
 };
@@ -81,7 +71,6 @@ const equiposDelUsuario = async (usuario_id) => {
     supabase.from('equipo_jugadores').select('equipo_id').eq('usuario_id', usuario_id).then(datos),
     supabase.from('equipo_staff').select('equipo_id').eq('usuario_id', usuario_id).then(datos),
   ]);
-
   let creados = [];
   try {
     creados = datos(await supabase.from('equipos').select('id').eq('creado_por', usuario_id)).map((e) => e.id);
@@ -240,8 +229,8 @@ export const actualizarEvento = async (req, res) => {
       }
     }
 
-    // Si cambia la agenda o los equipos, se revisan de nuevo las reglas con los datos ya combinados
     const final = { ...req.evento, ...cambios };
+
     // Solo se revisa si realmente se mueve la fecha u hora (editar un evento ya pasado, p. ej. su sede, sigue permitido)
     const dia = (f) => String(f).split('T')[0];
     const movido = dia(final.fecha) !== dia(req.evento.fecha) || String(final.hora).slice(0, 5) !== String(req.evento.hora).slice(0, 5);
@@ -250,6 +239,7 @@ export const actualizarEvento = async (req, res) => {
       if (pasado) return res.status(400).json({ mensaje: pasado });
     }
 
+    // Si cambia la agenda o los equipos, se revisan de nuevo las reglas con los datos ya combinados
     if (CAMPOS_AGENDA.some((c) => c in cambios)) {
       if (final.tipo === 'Partido') {
         const error = await validarPartido(final.torneo_id, final.equipo_local_id, final.equipo_visitante_id);

@@ -15,6 +15,7 @@ class CityDropdown extends StatelessWidget {
     'Bolívar',
     'Boyacá',
     'Caldas',
+    'Casanare',
     'Caquetá',
     'Cauca',
     'Cesar',

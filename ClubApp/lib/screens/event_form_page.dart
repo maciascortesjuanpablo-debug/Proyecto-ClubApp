@@ -86,14 +86,22 @@ class _EventFormPageState extends State<EventFormPage> {
   void _aviso(String texto) => ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(texto)));
 
   String _hhmm(TimeOfDay h) => '${h.hour.toString().padLeft(2, '0')}:${h.minute.toString().padLeft(2, '0')}';
-
-  // Solo se puede programar de hoy en adelante: los días anteriores aparecen deshabilitados en el selector
-  Future<void> _elegirFecha() async {
-    final hoy = DateUtils.dateOnly(DateTime.now());
-    final inicial = (_fecha != null && !_fecha!.isBefore(hoy)) ? _fecha! : hoy;
-    final f = await showDatePicker(context: context, initialDate: inicial, firstDate: hoy, lastDate: DateTime(hoy.year + 5), helpText: 'Elige una fecha desde hoy');
-    if (f != null) setState(() => _fecha = f);
-  }
+// Solo se puede programar dentro de la ventana de 40 días (hoy hasta hoy + 39).
+// Los días fuera de ese rango aparecen deshabilitados en el selector.
+Future<void> _elegirFecha() async {
+  final hoy = DateUtils.dateOnly(DateTime.now());
+  final limite = limiteEventos;
+  // initialDate debe estar dentro de [firstDate, lastDate] o showDatePicker lanza error
+  final inicial = (_fecha != null && !_fecha!.isBefore(hoy) && !_fecha!.isAfter(limite)) ? _fecha! : hoy;
+  final f = await showDatePicker(
+    context: context,
+    initialDate: inicial,
+    firstDate: hoy,
+    lastDate: limite,
+    helpText: 'Elige una fecha (máx. $diasVentanaEventos días)',
+  );
+  if (f != null) setState(() => _fecha = f);
+}
 
   Future<void> _elegirHora() async {
 
@@ -143,6 +151,7 @@ class _EventFormPageState extends State<EventFormPage> {
     // Al editar solo se revisa si se movió la fecha u hora (un evento pasado puede cambiar de sede sin moverlo)
     final movido = !_edicion || !DateUtils.isSameDay(_fecha, _fechaOriginal) || _hora != _horaOriginal;
     if (movido && diaPasado(_fecha!)) return _aviso('No se pueden programar eventos en fechas pasadas');
+    if (movido && diaFueraDeRango(_fecha!)) return _aviso('Solo se pueden programar eventos dentro de los próximos $diasVentanaEventos días');
     if (movido && enElPasado(_fecha!, _hora!)) return _aviso('Esa hora de hoy ya pasó, elige una hora posterior');
     if (partido && (_localId == null || _visitanteId == null)) return _aviso('Elige los dos equipos');
     if (partido && _localId.toString() == _visitanteId.toString()) return _aviso('Los equipos deben ser distintos');

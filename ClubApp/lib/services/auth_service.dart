@@ -3,7 +3,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:google_sign_in/google_sign_in.dart';
 import 'package:http/http.dart' as http;
-import '../core/app_constants.dart';
+import '../config/api_config.dart';
 
 class AuthService {
   // El token se guarda cifrado (Keystore en Android, Keychain en iOS)
@@ -11,7 +11,7 @@ class AuthService {
 
   static final _google = GoogleSignIn(
     scopes: const ['email', 'profile'],
-    serverClientId: AppConfig.googleServerClientId.isEmpty ? null : AppConfig.googleServerClientId,
+    serverClientId: ApiConfig.googleServerClientId.isEmpty ? null : ApiConfig.googleServerClientId,
   );
 
   static String? _token;
@@ -60,7 +60,7 @@ class AuthService {
     try {
       final r = await http
           .post(
-            Uri.parse('${AppConfig.apiUrl}$ruta'),
+            Uri.parse('${ApiConfig.baseUrl}$ruta'),
             headers: {'Content-Type': 'application/json', if (conSesion && _token != null) 'Authorization': 'Bearer $_token'},
             body: jsonEncode(cuerpo),
 
@@ -121,7 +121,7 @@ class AuthService {
   /// Abre el selector de cuentas de Google y entra con el token de identidad (el backend lo valida con Google).
   /// Devuelve {exito, nuevo, cancelado, mensaje}. `nuevo` = la cuenta se acaba de crear.
   static Future<Map<String, dynamic>> iniciarSesionConGoogle() async {
-    if (AppConfig.googleServerClientId.isEmpty) {
+    if (ApiConfig.googleServerClientId.isEmpty) {
       return {'exito': false, 'mensaje': 'Falta configurar GOOGLE_SERVER_CLIENT_ID para entrar con Google'};
     }
     try {

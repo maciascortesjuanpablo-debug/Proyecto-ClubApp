@@ -54,3 +54,19 @@ bool puedeGestionarEvento(Map<String, dynamic> evento) => miRol == 6 || (miRol =
 
 /// ¿Soy uno de los árbitros asignados a este evento?
 bool soyArbitroDe(Map<String, dynamic> evento) => ((evento['arbitros'] as List?) ?? []).any((a) => a['usuarios']?['id']?.toString() == _miId);
+
+
+/// Cantidad de días disponibles para programar, contando hoy
+const diasVentanaEventos = 40;
+
+/// Último día permitido: hoy + 39 (ventana móvil de 40 días, se recalcula siempre)
+DateTime get limiteEventos {
+  final hoy = DateTime.now();
+  return DateTime(hoy.year, hoy.month, hoy.day + diasVentanaEventos - 1);
+}
+
+/// true si el día está más allá de la ventana de 40 días
+bool diaFueraDeRango(DateTime d) => DateUtils.dateOnly(d).isAfter(limiteEventos);
+
+/// true si no se puede programar: ya pasó o está fuera de la ventana
+bool diaBloqueado(DateTime d) => diaPasado(d) || diaFueraDeRango(d);

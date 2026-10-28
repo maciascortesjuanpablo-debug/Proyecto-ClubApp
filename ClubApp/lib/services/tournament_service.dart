@@ -1,12 +1,12 @@
 import 'dart:convert';
 import 'package:http/http.dart' as http;
-import '../core/app_constants.dart';
+import '../config/api_config.dart';
 import 'auth_service.dart';
 
 class TournamentService {
   static const _timeout = Duration(seconds: 12);
 
-  static Uri _uri(String ruta) => Uri.parse('${AppConfig.apiUrl}$ruta');
+  static Uri _uri(String ruta) => Uri.parse('${ApiConfig.baseUrl}$ruta');
 
   /// Lista de objetos JSON (torneos, deportes, formatos) o null si falla la petición
   static Future<List<Map<String, dynamic>>?> _lista(String ruta) async {

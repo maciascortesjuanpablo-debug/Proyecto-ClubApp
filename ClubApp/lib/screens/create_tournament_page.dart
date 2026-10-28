@@ -5,6 +5,7 @@ import '../components/app_button.dart';
 import '../components/app_dropdown.dart';
 import '../components/app_text_field.dart';
 import '../components/citydrop_down.dart';
+import '../components/municipio_dropdown.dart';
 import '../components/home/load_error.dart';
 import '../services/tournament_service.dart';
 
@@ -25,11 +26,11 @@ class _CreateTournamentPageState extends State<CreateTournamentPage> {
   Map<Object, String> _formatos = {};
   Object? _deporteId;
   Object? _formatoId;
-  String? _ciudad;
+  String? _ciudad; // departamento
+  String? _municipio;
   bool _cargando = true;
   bool _errorCatalogo = false;
   bool _guardando = false;
-
 
   @override
   void initState() {
@@ -44,6 +45,9 @@ class _CreateTournamentPageState extends State<CreateTournamentPage> {
     }
     super.dispose();
   }
+
+  // Lo que se guarda en torneos.ciudad: "Pitalito, Huila" si eligió municipio; solo el departamento si no
+  String? get _ubicacion => _ciudad == null ? null : (_municipio == null ? _ciudad : '$_municipio, $_ciudad');
 
   Future<void> _cargarCatalogos() async {
     setState(() {
@@ -62,7 +66,6 @@ class _CreateTournamentPageState extends State<CreateTournamentPage> {
   }
 
   void _aviso(String texto) => ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(texto)));
-
 
   String? _validarEquipos(String? v) {
     final n = int.tryParse(v ?? '');
@@ -85,18 +88,17 @@ class _CreateTournamentPageState extends State<CreateTournamentPage> {
       deporteId: _deporteId!,
       formatoId: _formatoId!,
       maxEquipos: int.parse(_maxEquipos.text),
-      ciudad: _ciudad,
+      ciudad: _ubicacion,
       jornadaTotal: int.tryParse(_jornadas.text.trim()),
     );
     if (!mounted) return;
     setState(() => _guardando = false);
 
-    if (r['exito'] != true) return _aviso(r['mensaje']);
+    if (r['exito'] != true) return _aviso(r['mensaje'].toString());
     Navigator.pop(context, true); // la lista recarga y avisa
   }
 
   @override
-
   Widget build(BuildContext context) => Scaffold(
         backgroundColor: AppColors.bgDark,
         appBar: AppBar(backgroundColor: AppColors.bgDark, elevation: 0, title: const Text('Crear torneo')),
@@ -126,10 +128,19 @@ class _CreateTournamentPageState extends State<CreateTournamentPage> {
           Align(
             alignment: Alignment.centerLeft,
             child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-              const Text('Departamento', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: AppColors.textWhite)),
+              const Text('Departamento (opcional)', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: AppColors.textWhite)),
               const SizedBox(height: 10),
-              CityDropdown(selectedCity: _ciudad, onChanged: (c) => setState(() => _ciudad = c)),
-
+              CityDropdown(
+                selectedCity: _ciudad,
+                onChanged: (c) => setState(() {
+                  _ciudad = c;
+                  _municipio = null; // al cambiar de departamento se borra el municipio
+                }),
+              ),
+              const SizedBox(height: 16),
+              const Text('Municipio', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: AppColors.textWhite)),
+              const SizedBox(height: 10),
+              MunicipioDropdown(departamento: _ciudad, selected: _municipio, onChanged: (m) => setState(() => _municipio = m)),
             ]),
           ),
           const SizedBox(height: 16),

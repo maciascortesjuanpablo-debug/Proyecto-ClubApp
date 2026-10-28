@@ -1,13 +1,13 @@
 import 'dart:convert';
 import 'package:http/http.dart' as http;
-import '../core/app_constants.dart';
+import '../config/api_config.dart';
 import 'auth_service.dart';
 
 /// Cliente de /api/scout. Todas las respuestas son {exito, mensaje, ...datos}
 class ScoutService {
   static Future<Map<String, dynamic>> _pedir(String metodo, String ruta, {Map<String, dynamic>? cuerpo, int segundos = 15}) async {
     try {
-      final uri = Uri.parse('${AppConfig.apiUrl}/scout$ruta');
+      final uri = Uri.parse('${ApiConfig.baseUrl}/scout$ruta');
       final headers = {'Content-Type': 'application/json', 'Authorization': 'Bearer ${AuthService.token}'};
       final peticion = switch (metodo) {
         'POST' => http.post(uri, headers: headers, body: jsonEncode(cuerpo)),

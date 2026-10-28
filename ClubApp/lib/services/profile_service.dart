@@ -1,7 +1,7 @@
 import 'dart:convert';
 import 'package:http/http.dart' as http;
 import 'package:http_parser/http_parser.dart';
-import '../core/app_constants.dart';
+import '../config/api_config.dart';
 import 'auth_service.dart';
 
 /// Datos del usuario logueado. Todas las respuestas son {exito, mensaje, ...datos}
@@ -22,7 +22,7 @@ class ProfileService {
 
   static Future<Map<String, dynamic>> _pedir(String metodo, String ruta, {Map<String, dynamic>? cuerpo}) async {
     try {
-      final uri = Uri.parse('${AppConfig.apiUrl}$ruta');
+      final uri = Uri.parse('${ApiConfig.baseUrl}$ruta');
       final headers = {'Content-Type': 'application/json', 'Authorization': 'Bearer ${AuthService.token}'};
       final peticion = switch (metodo) {
         'POST' => http.post(uri, headers: headers, body: jsonEncode(cuerpo)),
@@ -60,7 +60,7 @@ class ProfileService {
   static Future<Map<String, dynamic>> subirFoto(String ruta) async {
     try {
       final extension = ruta.split('.').last.toLowerCase();
-      final peticion = http.MultipartRequest('PUT', Uri.parse('${AppConfig.apiUrl}/perfil-jugador/$_id/foto'))
+      final peticion = http.MultipartRequest('PUT', Uri.parse('${ApiConfig.baseUrl}/perfil-jugador/$_id/foto'))
         ..headers['Authorization'] = 'Bearer ${AuthService.token}'
         ..files.add(await http.MultipartFile.fromPath('foto', ruta, contentType: MediaType('image', extension == 'jpg' ? 'jpeg' : extension)));
 
