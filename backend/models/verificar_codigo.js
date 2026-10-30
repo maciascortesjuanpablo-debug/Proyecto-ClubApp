@@ -8,11 +8,13 @@ export const codigoVerificacionModel = {
     return datos(await codigos().insert({ usuario_id, codigo, tipo, expira_en }).select().single());
   },
 
-  async buscarValido({ usuario_id, codigo }) {
+  // El tipo es obligatorio: un código de recuperar contraseña no sirve para el login, ni al revés
+  async buscarValido({ usuario_id, codigo, tipo }) {
     return datos(await codigos()
       .select('*')
       .eq('usuario_id', usuario_id)
       .eq('codigo', codigo)
+      .eq('tipo', tipo)
       .eq('usado', false)
       .gte('expira_en', new Date().toISOString())
       .order('creado_en', { ascending: false })

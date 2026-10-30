@@ -1,10 +1,46 @@
 import bcrypt from 'bcrypt';
+import jwt from 'jsonwebtoken';
 import { usuarioModel } from '../models/usuario.js';
+import { codigoVerificacionModel } from '../models/verificar_codigo.js';
 import { firmarSesion } from '../utils/token.js';
+import { enviarCorreoCodigo, generarCodigo, CODIGO_MINUTOS } from '../utils/sendEmail.js';
 import { ROLES_REGISTRO, MSG_PASSWORD, fallo, normalizarCorreo, correoValido, passwordValida, texto } from '../utils/helpers.js';
 
 // Hash de relleno: compara siempre, exista o no el usuario, para no revelar cuentas por tiempo de respuesta
 const HASH_FALSO = bcrypt.hashSync('relleno-sin-uso', 10);
+
+const TIPO_2FA = 'login_2fa';
+const MAX_INTENTOS = 5;
+const intentos = new Map(); // intentos fallidos por usuario (en memoria: se reinicia con el servidor)
+
+// El segundo paso está activo salvo que en el .env pongas DOS_PASOS=false
+const dosPasosActivo = () => process.env.DOS_PASOS !== 'false';
+const enmascarar = (c) => c.replace(/^(.{1,2})[^@]*/, (_, p) => `${p}**`); // juan@gmail.com -> ju**@gmail.com
+const usuarioPublico = (u) => ({ id: u.id, nombre: u.nombre, apellido: u.apellido, correo: u.correo, rol_id: u.rol_id });
+const respuestaSesion = (u) => ({ mensaje: 'Inicio de sesión exitoso', token: firmarSesion(u), usuario: usuarioPublico(u) });
+
+// Genera y envía el código; devuelve el token del desafío que la app usa para verificar o reenviar
+const enviarDesafio = async (usuario) => {
+  await codigoVerificacionModel.invalidarPendientes(usuario.id, TIPO_2FA);
+  intentos.delete(usuario.id);
+  const codigo = generarCodigo();
+  await codigoVerificacionModel.crear({
+    usuario_id: usuario.id, codigo, tipo: TIPO_2FA,
+    expira_en: new Date(Date.now() + CODIGO_MINUTOS * 60 * 1000),
+  });
+  await enviarCorreoCodigo(usuario.correo, usuario.nombre, codigo, 'iniciar sesión en tu cuenta');
+  const tokenDesafio = jwt.sign({ id: usuario.id, proposito: '2fa' }, process.env.JWT_SECRET, { expiresIn: '15m' });
+  return { requiere2fa: true, mensaje: 'Te enviamos un código de verificación', tokenDesafio, correo: enmascarar(usuario.correo) };
+};
+
+const idDelDesafio = (token) => {
+  try {
+    const p = jwt.verify(token, process.env.JWT_SECRET);
+    return p.proposito === '2fa' ? p.id : null;
+  } catch {
+    return null;
+  }
+};
 
 export const registrar = async (req, res) => {
   try {
@@ -45,6 +81,7 @@ export const registrar = async (req, res) => {
   }
 };
 
+// PASO 1: contraseña correcta -> manda el código al correo (la sesión se abre en verificarDosPasos)
 export const iniciarSesion = async (req, res) => {
   try {
     const correo = normalizarCorreo(req.body.correo);
@@ -65,15 +102,55 @@ export const iniciarSesion = async (req, res) => {
       return res.status(403).json({ mensaje: 'Esta cuenta está inactiva' });
     }
 
-    res.json({
-      mensaje: 'Inicio de sesión exitoso',
-      token: firmarSesion(usuario),
-      usuario: {
-        id: usuario.id, nombre: usuario.nombre, apellido: usuario.apellido,
-        correo: usuario.correo, rol_id: usuario.rol_id,
-      },
-    });
+    res.json(dosPasosActivo() ? await enviarDesafio(usuario) : respuestaSesion(usuario));
   } catch (error) {
     fallo(res, error, 'Error al iniciar sesión');
+  }
+};
+
+// PASO 2: valida el código de 6 dígitos y abre la sesión
+export const verificarDosPasos = async (req, res) => {
+  try {
+    const id = idDelDesafio(req.body.tokenDesafio);
+    const codigo = String(req.body.codigo ?? '').trim();
+
+    if (!id) return res.status(401).json({ mensaje: 'La verificación expiró, inicia sesión de nuevo' });
+
+    const invalido = () => res.status(400).json({ mensaje: 'Código incorrecto o expirado' });
+    if (!/^\d{6}$/.test(codigo)) return invalido();
+
+    if ((intentos.get(id) ?? 0) >= MAX_INTENTOS) {
+      await codigoVerificacionModel.invalidarPendientes(id, TIPO_2FA);
+      return res.status(429).json({ mensaje: 'Demasiados intentos, solicita un código nuevo' });
+    }
+
+    const valido = await codigoVerificacionModel.buscarValido({ usuario_id: id, codigo, tipo: TIPO_2FA });
+    if (!valido) {
+      intentos.set(id, (intentos.get(id) ?? 0) + 1);
+      return invalido();
+    }
+
+    intentos.delete(id);
+    await codigoVerificacionModel.marcarUsado(valido.id);
+
+    const usuario = await usuarioModel.buscarConHash(id);
+    if (!usuario || usuario.activo === false) return res.status(403).json({ mensaje: 'Esta cuenta está inactiva' });
+
+    res.json(respuestaSesion(usuario));
+  } catch (error) {
+    fallo(res, error, 'Error al verificar el código');
+  }
+};
+
+export const reenviarDosPasos = async (req, res) => {
+  try {
+    const id = idDelDesafio(req.body.tokenDesafio);
+    const usuario = id && (await usuarioModel.buscarConHash(id));
+    if (!usuario) return res.status(401).json({ mensaje: 'La verificación expiró, inicia sesión de nuevo' });
+
+    await enviarDesafio(usuario);
+    res.json({ mensaje: 'Código reenviado' });
+  } catch (error) {
+    fallo(res, error, 'No se pudo reenviar el código');
   }
 };

@@ -2,11 +2,7 @@ import * as brevo from '@getbrevo/brevo';
 import crypto from 'crypto';
 import { esc } from './helpers.js';
 
-const apiInstance = new brevo.TransactionalEmailsApi();
-apiInstance.setApiKey(brevo.TransactionalEmailsApiApiKeys.apiKey, process.env.BREVO_API_KEY);
-
 const LOGO_URL = process.env.LOGO_URL ?? 'https://res.cloudinary.com/xkwp03du/image/upload/v1791131589/logo1.png';
-const REMITENTE = { name: process.env.BREVO_SENDER_NAME ?? process.env.EMAIL_FROM_NAME ?? 'ClubApp', email: process.env.BREVO_SENDER_EMAIL };
 export const CODIGO_MINUTOS = 10;
 
 export const generarCodigo = () => crypto.randomInt(100000, 1000000).toString();
@@ -34,10 +30,33 @@ const plantillaBase = (contenido) => `
   </div>
 `;
 
-export const enviarCorreoCodigo = async (correoDestino, nombre, codigo) => {
-  const contenido = `
+// Las variables se leen al enviar (no al importar), así dotenv ya las cargó
+const enviar = async (correoDestino, nombre, subject, contenido) => {
+  const { BREVO_API_KEY, BREVO_SENDER_EMAIL, BREVO_SENDER_NAME, EMAIL_FROM_NAME } = process.env;
+  if (!BREVO_API_KEY || !BREVO_SENDER_EMAIL) throw new Error('Faltan BREVO_API_KEY o BREVO_SENDER_EMAIL en el .env');
+
+  const api = new brevo.TransactionalEmailsApi();
+  api.setApiKey(brevo.TransactionalEmailsApiApiKeys.apiKey, BREVO_API_KEY);
+
+  const email = new brevo.SendSmtpEmail();
+  email.subject = subject;
+  email.htmlContent = plantillaBase(contenido);
+  email.sender = { name: BREVO_SENDER_NAME ?? EMAIL_FROM_NAME ?? 'ClubApp', email: BREVO_SENDER_EMAIL };
+  email.to = [{ email: correoDestino, name: nombre }];
+
+  try {
+    await api.sendTransacEmail(email);
+  } catch (e) {
+    console.error('Error Brevo:', e.response?.statusCode, e.response?.body ?? e.message);
+    throw e;
+  }
+};
+
+export const enviarCorreoCodigo = (correoDestino, nombre, codigo, motivo = 'recuperar tu contraseña') => enviar(
+  correoDestino, nombre, '🔐 Tu código de verificación - ClubApp',
+  `
     <h2 style="margin: 0 0 8px; font-size: 18px; color: white;">Hola ${esc(nombre)} 👋</h2>
-    <p style="color: #9ca3af; font-size: 14px; margin: 0 0 24px;">Recibimos una solicitud para recuperar tu contraseña. Usa este código para continuar:</p>
+    <p style="color: #9ca3af; font-size: 14px; margin: 0 0 24px;">Recibimos una solicitud para ${motivo}. Usa este código para continuar:</p>
 
     <div style="background-color: #0b1120; border: 1px solid #1f2937; border-radius: 12px; padding: 20px; text-align: center; margin-bottom: 20px;">
       <span style="font-size: 34px; letter-spacing: 12px; font-weight: bold; color: #22d3ee;">${codigo}</span>
@@ -48,19 +67,12 @@ export const enviarCorreoCodigo = async (correoDestino, nombre, codigo) => {
     </div>
 
     <p style="color: #6b7280; font-size: 12px; margin-top: 24px;">Si tú no solicitaste este código, puedes ignorar este correo con tranquilidad.</p>
-  `;
+  `
+);
 
-  const email = new brevo.SendSmtpEmail();
-  email.subject = '🔐 Tu código de verificación - ClubApp';
-  email.htmlContent = plantillaBase(contenido);
-  email.sender = REMITENTE;
-  email.to = [{ email: correoDestino, name: nombre }];
-
-  await apiInstance.sendTransacEmail(email);
-};
-
-export const enviarCorreoConfirmacionCambio = async (correoDestino, nombre) => {
-  const contenido = `
+export const enviarCorreoConfirmacionCambio = (correoDestino, nombre) => enviar(
+  correoDestino, nombre, '✅ Tu contraseña fue actualizada - ClubApp',
+  `
     <div style="text-align: center; margin-bottom: 20px;">
       <div style="width: 56px; height: 56px; background: rgba(34, 197, 94, 0.15); border-radius: 50%; margin: 0 auto 16px; display: flex; align-items: center; justify-content: center; font-size: 28px;">✅</div>
       <h2 style="margin: 0 0 8px; font-size: 18px; color: white;">¡Contraseña actualizada!</h2>
@@ -70,13 +82,5 @@ export const enviarCorreoConfirmacionCambio = async (correoDestino, nombre) => {
     <div style="background-color: rgba(239, 68, 68, 0.08); border-left: 3px solid #ef4444; border-radius: 8px; padding: 14px 16px; margin-top: 20px;">
       <p style="color: #fca5a5; font-size: 13px; margin: 0;">⚠️ Si no realizaste este cambio, contacta al soporte de inmediato.</p>
     </div>
-  `;
-
-  const email = new brevo.SendSmtpEmail();
-  email.subject = '✅ Tu contraseña fue actualizada - ClubApp';
-  email.htmlContent = plantillaBase(contenido);
-  email.sender = REMITENTE;
-  email.to = [{ email: correoDestino, name: nombre }];
-
-  await apiInstance.sendTransacEmail(email);
-};
+  `
+);
