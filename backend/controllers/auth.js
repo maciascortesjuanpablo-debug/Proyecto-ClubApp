@@ -133,7 +133,7 @@ export const verificarDosPasos = async (req, res) => {
     intentos.delete(id);
     await codigoVerificacionModel.marcarUsado(valido.id);
 
-    const usuario = await usuarioModel.buscarConHash(id);
+    const usuario = await usuarioModel.buscarPorId(id);
     if (!usuario || usuario.activo === false) return res.status(403).json({ mensaje: 'Esta cuenta está inactiva' });
 
     res.json(respuestaSesion(usuario));
