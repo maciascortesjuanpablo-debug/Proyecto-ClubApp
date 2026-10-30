@@ -1,6 +1,9 @@
 import { perfilJugadorModel } from '../models/perfil_jugador.js';
 import { eliminarImagen } from '../utils/cloudinaryutils.js';
-import { fallo, pick, texto } from '../utils/helpers.js';
+import { ROLES, fallo, pick, texto } from '../utils/helpers.js';
+
+// Quien no es jugador usa este perfil solo para su foto: la posición toma el nombre de su rol
+const NOMBRE_ROL = { [ROLES.USUARIO]: 'Usuario', [ROLES.ENTRENADOR]: 'Entrenador', [ROLES.ORGANIZADOR]: 'Organizador', [ROLES.ARBITRO]: 'Árbitro', [ROLES.ADMIN]: 'Administrador' };
 
 // avatar_url y los campos de verificación no se editan aquí: la foto se sube por /foto y la verificación la pone un admin
 const EDITABLES = ['posicion', 'pais', 'tipo_jugador'];
@@ -12,7 +15,9 @@ export const crearPerfil = async (req, res) => {
     if (await perfilJugadorModel.buscarPorUsuarioId(usuario_id)) {
       return res.status(409).json({ mensaje: 'Este usuario ya tiene un perfil creado' });
     }
-    const perfil = await perfilJugadorModel.crear({ usuario_id, ...limpiarCampos(req.body) });
+    const campos = limpiarCampos(req.body);
+    if (req.usuario.rol_id !== ROLES.JUGADOR && !campos.posicion) campos.posicion = NOMBRE_ROL[req.usuario.rol_id] ?? 'Usuario';
+    const perfil = await perfilJugadorModel.crear({ usuario_id, ...campos });
     res.status(201).json({ mensaje: 'Perfil creado', perfil });
   } catch (error) {
     fallo(res, error, 'Error al crear el perfil');

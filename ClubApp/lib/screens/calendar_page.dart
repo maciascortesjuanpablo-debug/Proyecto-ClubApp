@@ -10,9 +10,15 @@ import '../services/calendar_service.dart';
 import 'event_detail_page.dart';
 import 'event_form_page.dart';
 
-/// Pestaña Calendario: mes con puntos en los días que tienen eventos y la lista del día elegido
+/// Pestaña Calendario: mes con puntos en los días que tienen eventos y la lista del día elegido.
+/// Cada rol lo abre con su vista: [miosPorDefecto] muestra solo lo suyo y [permitirTodos] decide si puede cambiar a ver todo
+/// (el árbitro solo ve sus designaciones).
 class CalendarPage extends StatefulWidget {
-  const CalendarPage({super.key});
+  final bool miosPorDefecto;
+  final bool permitirTodos;
+  final String titulo;
+
+  const CalendarPage({super.key, this.miosPorDefecto = false, this.permitirTodos = true, this.titulo = 'Calendario'});
 
   @override
   State<CalendarPage> createState() => _CalendarPageState();
@@ -21,7 +27,7 @@ class CalendarPage extends StatefulWidget {
 class _CalendarPageState extends State<CalendarPage> with WidgetsBindingObserver {
   late DateTime _mes = DateTime(DateTime.now().year, DateTime.now().month);
   DateTime _dia = DateUtils.dateOnly(DateTime.now());
-  bool _mios = false;
+  late bool _mios = widget.miosPorDefecto;
   final _porDia = <String, List<Map<String, dynamic>>>{};
   bool _cargando = true;
   String? _error;
@@ -112,7 +118,7 @@ class _CalendarPageState extends State<CalendarPage> with WidgetsBindingObserver
       appBar: AppBar(
         backgroundColor: AppColors.bgDark,
         elevation: 0,
-        title: const Text('Calendario'),
+        title: Text(widget.titulo),
         actions: [TextButton(onPressed: () => _irAMes(DateTime.now()), child: const Text('Hoy', style: TextStyle(color: AppColors.secondary, fontWeight: FontWeight.bold)))],
       ),
       floatingActionButton: puedeCrearEventos
@@ -135,18 +141,19 @@ class _CalendarPageState extends State<CalendarPage> with WidgetsBindingObserver
               Text('${nombresMes[_mes.month - 1][0].toUpperCase()}${nombresMes[_mes.month - 1].substring(1)} ${_mes.year}', style: const TextStyle(fontSize: 18, color: AppColors.textWhite, fontWeight: FontWeight.bold)),
               IconButton(icon: const Icon(Icons.chevron_right, color: AppColors.textWhite), onPressed: () => _irAMes(DateTime(_mes.year, _mes.month + 1))),
             ]),
-            FiltroChips<bool>(
-              opciones: const {'Todos los eventos': false, 'Mis partidos': true},
-              valor: _mios,
-              onChanged: (v) {
-                if (v == true && !requireAuth(context)) return; // "Mis partidos" necesita sesión
-                setState(() {
-                  _mios = v ?? false;
-                  _cargando = true;
-                });
-                _cargar();
-              },
-            ),
+            if (widget.permitirTodos)
+              FiltroChips<bool>(
+                opciones: const {'Todos los eventos': false, 'Mis partidos': true},
+                valor: _mios,
+                onChanged: (v) {
+                  if (v == true && !requireAuth(context)) return; // "Mis partidos" necesita sesión
+                  setState(() {
+                    _mios = v ?? false;
+                    _cargando = true;
+                  });
+                  _cargar();
+                },
+              ),
             const SizedBox(height: 12),
             MonthGrid(mes: _mes, seleccionado: _dia, eventosPorDia: {for (final e in _porDia.entries) e.key: e.value.length}, onSeleccionar: (d) => setState(() => _dia = d)),
             if (bloqueado && puedeCrearEventos)

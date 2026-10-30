@@ -1,44 +1,26 @@
 import 'package:flutter/material.dart';
-import '../components/app_dialogs.dart';
-import '../components/nav_bar.dart';
-import 'home_page.dart';
-import 'profile_page.dart';
-import 'scout_page.dart';
-import 'tournaments_page.dart'; 
-import 'calendar_page.dart';
+import '../core/roles.dart';
+import '../services/auth_service.dart';
+import 'shell/general_shell.dart';
+import 'shell/role_shells.dart';
 
-class MainShell extends StatefulWidget {
+/// Punto de entrada tras iniciar sesión. Elige la navegación según el rol de la sesión:
+/// cada rol (jugador, entrenador, organizador, árbitro, administrador) tiene sus propias pantallas
+/// y no puede entrar a las de otro. Invitados y cuentas sin rol usan la navegación general (solo consulta).
+class MainShell extends StatelessWidget {
   final int initialIndex;
   const MainShell({super.key, this.initialIndex = 0});
 
   @override
-  State<MainShell> createState() => _MainShellState();
-}
-
-class _MainShellState extends State<MainShell> {
-  late int _index = widget.initialIndex;
-
-  void _ir(int i) {
-  // Scout AI se abre a pantalla completa (necesita el teclado y su propio historial)
-  if (i == 4) {
-    if (requireAuth(context)) {
-      Navigator.push(context, MaterialPageRoute(builder: (_) => const ScoutPage()));
-    }
-    return;
+  Widget build(BuildContext context) {
+    if (AuthService.isGuest) return GeneralShell(initialIndex: initialIndex);
+    return switch (RolApp.actual) {
+      RolApp.jugador => JugadorShell(initialIndex: initialIndex),
+      RolApp.entrenador => EntrenadorShell(initialIndex: initialIndex),
+      RolApp.organizador => OrganizadorShell(initialIndex: initialIndex),
+      RolApp.arbitro => ArbitroShell(initialIndex: initialIndex),
+      RolApp.admin => AdminShell(initialIndex: initialIndex),
+      RolApp.usuario => GeneralShell(initialIndex: initialIndex),
+    };
   }
-  setState(() => _index = i);
-}
-
-  @override
-  Widget build(BuildContext context) => Scaffold(
-        body: IndexedStack(index: _index, children: [
-
-          HomePage(onIrATab: _ir),
-          const TournamentsPage(),
-          const ProfilePage(),
-          const CalendarPage(),
-          const ScoutPage(), // Se abre a pantalla completa, no se muestra en el IndexedStack
-        ]),
-        bottomNavigationBar: BottomNavBar(currentIndex: _index, onTap: _ir),
-      );
 }

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../core/app_colors.dart';
 import '../core/perfil_constants.dart';
+import '../core/roles.dart';
 import '../core/validators.dart';
 import '../components/app_button.dart';
 import '../components/app_dropdown.dart';
@@ -56,6 +57,9 @@ class _EditProfilePageState extends State<EditProfilePage> {
 
   void _aviso(String texto) => ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(texto)));
 
+  // Solo el jugador tiene nivel de juego y perfil deportivo; los demás roles editan solo sus datos personales
+  bool get _esJugador => RolApp.deId(widget.usuario['rol_id']) == RolApp.jugador;
+
   Future<void> _guardar() async {
     if (!(_formKey.currentState?.validate() ?? false)) return;
     setState(() => _guardando = true);
@@ -69,12 +73,12 @@ class _EditProfilePageState extends State<EditProfilePage> {
       'numero_celular': _celular.text.trim(),
       'fecha_nacimiento': _aIso(_fecha.text.trim()),
       'ciudad': _ciudad ?? '',
-      'nivel_juego': _nivel ?? '',
+      if (_esJugador) 'nivel_juego': _nivel ?? '',
     });
     if (r['exito'] != true) return _fallo(r['mensaje'].toString());
 
     final jugador = {'posicion': _posicion.text.trim(), 'pais': _pais.text.trim(), 'tipo_jugador': _tipo.text.trim()};
-    if (jugador.values.any((v) => v.isNotEmpty) || widget.perfil != null) {
+    if (_esJugador && (jugador.values.any((v) => v.isNotEmpty) || widget.perfil != null)) {
       final rj = await ProfileService.guardarPerfilJugador(jugador, existe: widget.perfil != null);
       if (rj['exito'] != true) return _fallo(rj['mensaje'].toString());
     }
@@ -130,14 +134,16 @@ class _EditProfilePageState extends State<EditProfilePage> {
                 ),
                 const SizedBox(height: 16),
 
-                AppDropdown<String>(label: 'Nivel de juego', hint: 'Selecciona tu nivel', value: _nivel, items: {for (final n in nivelesJuego) n: n}, onChanged: (v) => setState(() => _nivel = v)),
-                const SizedBox(height: 28),
-                _titulo('Perfil de jugador'),
-                AppTextField(label: 'Posición en el campo', hint: 'Ej: Delantero, Portero...', controller: _posicion),
-                const SizedBox(height: 16),
-                AppTextField(label: 'País', hint: 'Colombia', controller: _pais),
-                const SizedBox(height: 16),
-                AppTextField(label: 'Tipo de jugador', hint: 'Ej: Amateur, Semiprofesional...', controller: _tipo),
+                if (_esJugador) ...[
+                  AppDropdown<String>(label: 'Nivel de juego', hint: 'Selecciona tu nivel', value: _nivel, items: {for (final n in nivelesJuego) n: n}, onChanged: (v) => setState(() => _nivel = v)),
+                  const SizedBox(height: 28),
+                  _titulo('Perfil de jugador'),
+                  AppTextField(label: 'Posición en el campo', hint: 'Ej: Delantero, Portero...', controller: _posicion),
+                  const SizedBox(height: 16),
+                  AppTextField(label: 'País', hint: 'Colombia', controller: _pais),
+                  const SizedBox(height: 16),
+                  AppTextField(label: 'Tipo de jugador', hint: 'Ej: Amateur, Semiprofesional...', controller: _tipo),
+                ],
                 const SizedBox(height: 32),
                 AppButton(label: 'Guardar cambios', isLoading: _guardando, backgroundColor: AppColors.blue, onPressed: _guardar),
               ]),

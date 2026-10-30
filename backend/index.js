@@ -20,6 +20,7 @@ import favoritosRoutes from './routes/favoritos.js';
 import scoutIARoutes from './routes/scoutIA.js';
 import homeRoutes from './routes/home.js';
 import adminRoutes from './routes/admin.js'; 
+import panelRoutes from './routes/panel.js';
 
 conectaDB();
 
@@ -53,6 +54,7 @@ const rutas = {
   scout: scoutIARoutes,
   home: homeRoutes,
   admin: adminRoutes,
+  panel: panelRoutes,
 };
 for (const [ruta, router] of Object.entries(rutas)) app.use(`/api/${ruta}`, router);
 

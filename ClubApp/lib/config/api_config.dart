@@ -17,7 +17,7 @@ class ApiConfig {
     return 'http://10.0.2.2:3000/api'; 
   }
 
-  static const String googleServerClientId = '52252720899-h0qh1954pf716ms37tkjccfilulf8frh.apps.googleusercontent.com';
+  static const String googleServerClientId = '52252720899-h0qhl954pf716ms3t7kjccfilulf8frh.apps.googleusercontent.com';
 
   // Resto de configuraciones...
   static const Map<String, String> headers = {

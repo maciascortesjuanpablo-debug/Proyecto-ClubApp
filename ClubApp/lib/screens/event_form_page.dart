@@ -5,12 +5,15 @@ import '../components/app_button.dart';
 import '../components/app_dropdown.dart';
 import '../services/calendar_service.dart';
 
-/// Crear o editar un evento. Para editar se pasa `evento`; para crear, opcionalmente la fecha preseleccionada.
+/// Crear o editar un evento. Para editar se pasa `evento`; para crear, opcionalmente la fecha preseleccionada
+/// y el torneo (cuando se programa desde el calendario de un torneo, queda fijo).
 class EventFormPage extends StatefulWidget {
   final Map<String, dynamic>? evento;
   final DateTime? fechaInicial;
+  final Object? torneoId;
+  final String? torneoNombre;
 
-  const EventFormPage({super.key, this.evento, this.fechaInicial});
+  const EventFormPage({super.key, this.evento, this.fechaInicial, this.torneoId, this.torneoNombre});
 
   @override
   State<EventFormPage> createState() => _EventFormPageState();
@@ -18,6 +21,7 @@ class EventFormPage extends StatefulWidget {
 
 class _EventFormPageState extends State<EventFormPage> {
   bool get _edicion => widget.evento != null;
+  bool get _torneoFijo => !_edicion && widget.torneoId != null;
 
   Map<Object, String> _torneos = {};
   Map<Object, String> _equipos = {};
@@ -57,6 +61,7 @@ class _EventFormPageState extends State<EventFormPage> {
       if (_torneoId != null) _torneos = {_torneoId!: (e['torneo']?['nombre'] ?? 'Torneo').toString()};
     } else {
       _fecha = widget.fechaInicial;
+      _torneoId = widget.torneoId;
     }
 
     final r = await Future.wait([CalendarService.torneosGestionables(), CalendarService.sedes()]);
@@ -200,7 +205,9 @@ Future<void> _elegirFecha() async {
               child: SingleChildScrollView(
                 padding: const EdgeInsets.all(20),
                 child: Column(children: [
-                  if (_edicion)
+                  if (_torneoFijo)
+                    _selector('Torneo', Icons.emoji_events_outlined, widget.torneoNombre ?? _torneos[widget.torneoId] ?? 'Torneo', () {})
+                  else if (_edicion)
                     _selector('Torneo', Icons.emoji_events_outlined, _torneos.values.firstOrNull ?? '-', () {})
                   else if (_torneos.isEmpty)
                     const Text('No tienes torneos donde crear eventos. Crea un torneo primero.', textAlign: TextAlign.center, style: TextStyle(color: AppColors.textGray))

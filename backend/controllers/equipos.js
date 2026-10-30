@@ -1,5 +1,7 @@
+import { supabase } from '../config/supabase.js';
 import { equipoModel } from '../models/equipos.js';
-import { fallo, pick, texto } from '../utils/helpers.js';
+import { panelModel } from '../models/panel.js';
+import { ROLES, datos, fallo, pick, texto } from '../utils/helpers.js';
 import { esDuenoEquipo } from '../utils/permisos.js';
 
 // Middleware: carga el equipo de :id y exige que el usuario sea su dueño (o Admin)
@@ -143,5 +145,69 @@ export const eliminarStaffEquipo = async (req, res) => {
     res.json({ mensaje: 'Staff eliminado del equipo' });
   } catch (error) {
     fallo(res, error, 'Error al eliminar el staff');
+  }
+};
+
+// ---- EQUIPOS PROPIOS Y PARTIDOS ----
+
+// Mis equipos según mi rol: el entrenador ve los que dirige; el jugador, aquellos donde juega.
+export const misEquipos = async (req, res) => {
+  try {
+    const { id, rol_id } = req.usuario;
+    const lista = rol_id === ROLES.ENTRENADOR ? await panelModel.equiposDeEntrenador(id) : await panelModel.equiposDeJugador(id);
+    const conteo = await panelModel.contarJugadores(lista.map((e) => e.id));
+    res.json(lista.map((e) => ({ ...e, jugadores: conteo[e.id] ?? 0 })));
+  } catch (error) {
+    fallo(res, error, 'Error al obtener tus equipos');
+  }
+};
+
+// Partidos de un equipo (de local o de visitante) con su balance. Es información pública, como la tabla de posiciones.
+export const partidosDeEquipo = async (req, res) => {
+  try {
+    const equipo = await equipoModel.buscarPorId(req.params.id);
+    if (!equipo) return res.status(404).json({ mensaje: 'Equipo no encontrado' });
+
+    const [local, visitante] = await Promise.all([
+      panelModel.eventosPor('equipo_local_id', [equipo.id], { limite: 200 }),
+      panelModel.eventosPor('equipo_visitante_id', [equipo.id], { limite: 200 }),
+    ]);
+    const partidos = await panelModel.conTorneo(panelModel.unir(local, visitante));
+
+    const balance = { pj: 0, g: 0, e: 0, p: 0, gf: 0, gc: 0 };
+    for (const p of partidos) {
+      if (p.tipo !== 'Partido' || p.estado !== 'Finalizado' || p.resultado_local == null || p.resultado_visitante == null) continue;
+      const esLocal = String(p.equipo_local_id) === String(equipo.id);
+      const [gf, gc] = esLocal ? [p.resultado_local, p.resultado_visitante] : [p.resultado_visitante, p.resultado_local];
+      balance.pj++; balance.gf += gf; balance.gc += gc;
+      if (gf > gc) balance.g++; else if (gf === gc) balance.e++; else balance.p++;
+    }
+    res.json({ equipo, partidos, balance });
+  } catch (error) {
+    fallo(res, error, 'Error al obtener los partidos del equipo');
+  }
+};
+
+// Buscador de jugadores para invitarlos (solo entrenadores y admin). Devuelve lo mínimo: nombre, ciudad, nivel y posición.
+export const buscarJugadores = async (req, res) => {
+  try {
+    const q = texto(req.query.q, 60).replace(/[%,()*\\]/g, ' ').trim();
+    let consulta = supabase.from('usuarios').select('id, nombre, apellido, ciudad, nivel_juego').eq('rol_id', ROLES.JUGADOR).eq('activo', true).order('nombre').limit(20);
+    if (q) consulta = consulta.or(`nombre.ilike.%${q}%,apellido.ilike.%${q}%`);
+    const jugadores = datos(await consulta);
+
+    const ids = jugadores.map((j) => j.id);
+    const perfiles = ids.length ? datos(await supabase.from('perfil_jugador').select('usuario_id, posicion').in('usuario_id', ids)) : [];
+    const posicion = Object.fromEntries(perfiles.map((p) => [String(p.usuario_id), p.posicion]));
+
+    // Si se indica el equipo, se excluyen quienes ya están en su plantilla
+    let enEquipo = new Set();
+    if (req.query.equipoId) {
+      const filas = datos(await supabase.from('equipo_jugadores').select('usuario_id').eq('equipo_id', req.query.equipoId));
+      enEquipo = new Set(filas.map((f) => String(f.usuario_id)));
+    }
+    res.json(jugadores.filter((j) => !enEquipo.has(String(j.id))).map((j) => ({ ...j, posicion: posicion[String(j.id)] ?? null })));
+  } catch (error) {
+    fallo(res, error, 'Error al buscar jugadores');
   }
 };

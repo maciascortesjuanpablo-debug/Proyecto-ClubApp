@@ -2,7 +2,7 @@ import { supabase } from '../config/supabase.js';
 import { datos } from '../utils/helpers.js';
 
 const eventos = () => supabase.from('eventos_calendario');
-const SELECT_EVENTO = `*, sedes_canchas(id, nombre, direccion, ciudad),
+export const SELECT_EVENTO = `*, sedes_canchas(id, nombre, direccion, ciudad),
   equipo_local:equipo_local_id(id, nombre, logo_url),
   equipo_visitante:equipo_visitante_id(id, nombre, logo_url)`;
 

@@ -2,26 +2,37 @@ import 'dart:ui';
 import 'package:flutter/material.dart';
 import '../core/app_colors.dart';
 
+/// Una pestaña de la barra inferior
+class NavDestino {
+  final IconData icon;
+  final String label;
+  const NavDestino(this.icon, this.label);
+}
+
+/// Barra inferior flotante. Cada rol pasa sus propias pestañas en [items]; sin ellas muestra las generales.
 class BottomNavBar extends StatelessWidget {
   final int currentIndex;
   final Function(int) onTap;
+  final List<NavDestino>? items;
 
   const BottomNavBar({
     super.key,
     required this.currentIndex,
     required this.onTap,
+    this.items,
   });
 
-  static const _items = [
-    _NavItem(Icons.home_rounded, 'Inicio'),
-    _NavItem(Icons.emoji_events_rounded, 'Torneos'),
-    _NavItem(Icons.person_rounded, 'Perfil'),
-    _NavItem(Icons.calendar_month_rounded, 'Calendario'),
-    _NavItem(Icons.smart_toy_outlined, 'Scout AI'),
+  static const _generales = [
+    NavDestino(Icons.home_rounded, 'Inicio'),
+    NavDestino(Icons.emoji_events_rounded, 'Torneos'),
+    NavDestino(Icons.person_rounded, 'Perfil'),
+    NavDestino(Icons.calendar_month_rounded, 'Calendario'),
+    NavDestino(Icons.smart_toy_outlined, 'Scout AI'),
   ];
 
   @override
   Widget build(BuildContext context) {
+    final _items = items ?? _generales;
     return SafeArea(
       top: false,
       child: Padding(
@@ -118,10 +129,4 @@ class BottomNavBar extends StatelessWidget {
       ),
     );
   }
-}
-
-class _NavItem {
-  final IconData icon;
-  final String label;
-  const _NavItem(this.icon, this.label);
 }
