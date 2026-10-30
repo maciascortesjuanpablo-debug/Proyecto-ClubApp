@@ -1,5 +1,8 @@
+import { supabase } from '../config/supabase.js';
 import { torneoModel } from '../models/torneos.js';
-import { entero, fallo, pick, texto } from '../utils/helpers.js';
+import { inscripcionModel } from '../models/inscripciones.js';
+import { panelModel } from '../models/panel.js';
+import { ahora, datos, entero, fallo, pick, texto } from '../utils/helpers.js';
 import { esOrganizadorTorneo } from '../utils/permisos.js';
 
 // Middleware: carga el torneo de :id y exige que el usuario sea su organizador (o Admin)
@@ -102,5 +105,70 @@ export const obtenerGruposPorTorneo = async (req, res) => {
     res.json(await torneoModel.listarGruposPorTorneo(req.params.id));
   } catch (error) {
     fallo(res, error, 'Error al obtener los grupos');
+  }
+};
+
+// RESUMEN: todo lo que muestra la pestaña "Resumen" de un torneo (público, como la tabla de posiciones)
+export const resumenTorneo = async (req, res) => {
+  try {
+    const torneo = await torneoModel.buscarPorId(req.params.id);
+    if (!torneo) return res.status(404).json({ mensaje: 'Torneo no encontrado' });
+
+    const [inscripciones, eventos, tabla] = await Promise.all([
+      supabase.from('inscripciones_equipo').select('id, estado').eq('torneo_id', torneo.id).then(datos),
+      panelModel.eventosPor('torneo_id', [torneo.id], { limite: 1000 }),
+      inscripcionModel.obtenerTablaPorTorneo(torneo.id),
+    ]);
+
+    const partidos = eventos.filter((e) => e.tipo === 'Partido');
+    const contar = (estado) => partidos.filter((p) => p.estado === estado).length;
+    const jugados = partidos.filter((p) => p.estado === 'Finalizado' && p.resultado_local != null && p.resultado_visitante != null);
+    const goles = jugados.reduce((a, p) => a + p.resultado_local + p.resultado_visitante, 0);
+
+    // Líder: mismo criterio de desempate que la tabla de posiciones
+    const ordenada = [...tabla].sort((a, b) => b.puntos - a.puntos || (b.goles_favor - b.goles_contra) - (a.goles_favor - a.goles_contra) || b.goles_favor - a.goles_favor);
+    const lider = ordenada[0]?.inscripciones_equipo?.equipos
+      ? { equipo: ordenada[0].inscripciones_equipo.equipos, puntos: ordenada[0].puntos, pj: ordenada[0].victorias + ordenada[0].empates + ordenada[0].derrotas }
+      : null;
+
+    // Goleadores: suma de goles por jugador en los partidos del torneo
+    const idsEventos = eventos.map((e) => e.id);
+    const filas = idsEventos.length
+      ? datos(await supabase.from('estadisticas_jugador').select('usuario_id, goles, usuarios ( nombre, apellido ), equipos ( nombre )').in('evento_id', idsEventos).gt('goles', 0))
+      : [];
+    const porJugador = new Map();
+    for (const f of filas) {
+      const previo = porJugador.get(String(f.usuario_id)) ?? { usuario_id: f.usuario_id, nombre: f.usuarios?.nombre ?? '', apellido: f.usuarios?.apellido ?? '', equipo: f.equipos?.nombre ?? '', goles: 0 };
+      previo.goles += f.goles;
+      porJugador.set(String(f.usuario_id), previo);
+    }
+    const goleadores = [...porJugador.values()].sort((a, b) => b.goles - a.goles).slice(0, 5);
+
+    const hoy = ahora().fecha;
+    const dia = (e) => String(e.fecha).slice(0, 10);
+    const proximo = partidos.find((p) => !['Finalizado', 'Cancelado'].includes(p.estado) && dia(p) >= hoy) ?? null;
+    const ultimo = [...jugados].reverse()[0] ?? null;
+    const [proximoConTorneo, ultimoConTorneo] = await Promise.all([
+      proximo ? panelModel.conTorneo([proximo]).then((l) => l[0]) : null,
+      ultimo ? panelModel.conTorneo([ultimo]).then((l) => l[0]) : null,
+    ]);
+
+    res.json({
+      torneo,
+      equipos: {
+        aceptados: inscripciones.filter((i) => i.estado === 'Aceptado').length,
+        pendientes: inscripciones.filter((i) => i.estado === 'Pendiente').length,
+        rechazados: inscripciones.filter((i) => i.estado === 'Rechazado').length,
+        max: torneo.max_equipos,
+      },
+      partidos: { total: partidos.length, programados: contar('Programado'), enVivo: contar('En vivo'), finalizados: contar('Finalizado'), aplazados: contar('Aplazado'), cancelados: contar('Cancelado') },
+      goles: { total: goles, promedio: jugados.length ? Math.round((goles / jugados.length) * 100) / 100 : 0 },
+      lider,
+      proximo: proximoConTorneo,
+      ultimo: ultimoConTorneo,
+      goleadores,
+    });
+  } catch (error) {
+    fallo(res, error, 'Error al obtener el resumen del torneo');
   }
 };

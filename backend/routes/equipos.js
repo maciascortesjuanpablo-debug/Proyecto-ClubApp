@@ -2,18 +2,22 @@ import { Router } from 'express';
 import {
   crearEquipo, obtenerEquipos, obtenerEquipoPorId, actualizarEquipo, eliminarEquipo, equipoPropio,
   agregarJugadorEquipo, obtenerPlantilla, actualizarJugadorEquipo, eliminarJugadorEquipo,
-  agregarStaffEquipo, obtenerStaffEquipo, eliminarStaffEquipo,
+  agregarStaffEquipo, obtenerStaffEquipo, eliminarStaffEquipo, misEquipos, partidosDeEquipo, buscarJugadores,
 } from '../controllers/equipos.js';
 import { verificarToken, verificarRol } from '../middlewares/middlewares.js';
 import { ROLES } from '../utils/helpers.js';
 
-const { ENTRENADOR, ORGANIZADOR, ADMIN } = ROLES;
+const { ENTRENADOR, JUGADOR, ADMIN } = ROLES;
 const router = Router();
-// Solo el dueño del equipo (o Admin) puede modificarlo
-const gestion = [verificarToken, verificarRol(ENTRENADOR, ORGANIZADOR, ADMIN), equipoPropio];
+// Los equipos los gestiona el entrenador (solo el dueño del equipo) o el Admin; el organizador administra torneos, no equipos
+const gestion = [verificarToken, verificarRol(ENTRENADOR, ADMIN), equipoPropio];
 
-router.post('/', verificarToken, verificarRol(ENTRENADOR, ORGANIZADOR, ADMIN), crearEquipo);
+router.post('/', verificarToken, verificarRol(ENTRENADOR, ADMIN), crearEquipo);
 router.get('/', obtenerEquipos);
+// Rutas fijas: van ANTES de /:id
+router.get('/mios', verificarToken, verificarRol(ENTRENADOR, JUGADOR), misEquipos);
+router.get('/buscar-jugadores', verificarToken, verificarRol(ENTRENADOR, ADMIN), buscarJugadores);
+router.get('/:id/partidos', partidosDeEquipo);
 router.get('/:id', obtenerEquipoPorId);
 router.put('/:id', ...gestion, actualizarEquipo);
 router.delete('/:id', ...gestion, eliminarEquipo);

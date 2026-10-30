@@ -5,6 +5,7 @@ import '../components/app_button.dart';
 import '../components/app_dropdown.dart';
 import '../components/app_text_field.dart';
 import '../services/admin_service.dart';
+import 'torneo/torneo_page.dart';
 
 /// El administrador edita cualquier dato de un torneo, cambia al organizador o lo elimina con todos sus datos.
 class AdminTorneoPage extends StatefulWidget {
@@ -117,7 +118,19 @@ class _AdminTorneoPageState extends State<AdminTorneoPage> {
     final estados = {..._estadosBase, ...widget.estadosExistentes.where((e) => e.isNotEmpty), if (_estado != null) _estado!};
     return Scaffold(
       backgroundColor: AppColors.bgDark,
-      appBar: AppBar(backgroundColor: AppColors.bgDark, elevation: 0, title: const Text('Editar torneo')),
+      appBar: AppBar(
+        backgroundColor: AppColors.bgDark,
+        elevation: 0,
+        title: const Text('Editar torneo'),
+        actions: [
+          // El admin ve el torneo completo: resumen, posiciones, partidos, equipos y calendario de programación
+          TextButton.icon(
+            onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => TorneoPage(torneoId: widget.torneo['id'] as Object, nombre: widget.torneo['nombre']?.toString()))),
+            icon: const Icon(Icons.leaderboard, size: 18),
+            label: const Text('Ver torneo'),
+          ),
+        ],
+      ),
       body: SafeArea(
         child: SingleChildScrollView(
           padding: const EdgeInsets.all(20),

@@ -2,15 +2,22 @@ import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import '../core/app_colors.dart';
 import '../core/navigation.dart';
-import '../core/perfil_constants.dart';
+import '../core/roles.dart';
+import '../components/charts.dart';
 import '../components/login_required_view.dart';
 import '../components/tournament_chip.dart';
+import '../components/ui_kit.dart';
+import '../models/models.dart';
 import '../services/auth_service.dart';
+import '../services/panel_service.dart';
 import '../services/profile_service.dart';
 import 'change_password_page.dart';
 import 'edit_profile_page.dart';
 import 'admin_page.dart';
 
+/// Perfil de la persona. La cabecera, los datos personales y las acciones son comunes;
+/// lo que hay en medio depende del rol: el jugador ve sus estadísticas de juego, el entrenador sus equipos,
+/// el organizador sus torneos y el árbitro sus partidos dirigidos.
 class ProfilePage extends StatefulWidget {
   const ProfilePage({super.key});
 
@@ -19,12 +26,21 @@ class ProfilePage extends StatefulWidget {
 }
 
 class _ProfilePageState extends State<ProfilePage> {
-  Map<String, dynamic>? _usuario;
-  Map<String, dynamic>? _perfil; // null = todavía no tiene perfil de jugador
-  List _stats = []; // una fila por partido jugado
+  Map<String, dynamic>? _usuarioJson;
+  Usuario? _usuario;
+  Map<String, dynamic>? _perfilJson; // null = todavía no tiene perfil con foto
+  PerfilJugador? get _perfil => _perfilJson == null ? null : PerfilJugador.fromJson(_perfilJson!);
+
+  PanelJugador? _pj;
+  PanelEntrenador? _pe;
+  PanelOrganizador? _po;
+  PanelArbitro? _pa;
+
   bool _cargando = true;
   bool _subiendoFoto = false;
   String? _error;
+
+  RolApp get _rol => _usuario?.rol ?? RolApp.actual;
 
   @override
   void initState() {
@@ -32,10 +48,27 @@ class _ProfilePageState extends State<ProfilePage> {
     _cargar();
   }
 
-
   Future<void> _cargar() async {
     if (AuthService.isGuest) return;
-    final r = await Future.wait([ProfileService.usuario(), ProfileService.perfilJugador(), ProfileService.estadisticas()]);
+    final rol = RolApp.actual;
+    final r = await Future.wait([ProfileService.usuario(), ProfileService.perfilJugador()]);
+    // Solo se pide el panel del rol propio (el backend rechaza los demás)
+    PanelJugador? pj;
+    PanelEntrenador? pe;
+    PanelOrganizador? po;
+    PanelArbitro? pa;
+    switch (rol) {
+      case RolApp.jugador:
+        pj = (await PanelService.jugador()).dato;
+      case RolApp.entrenador:
+        pe = (await PanelService.entrenador()).dato;
+      case RolApp.organizador:
+        po = (await PanelService.organizador()).dato;
+      case RolApp.arbitro:
+        pa = (await PanelService.arbitro()).dato;
+      default:
+        break;
+    }
     if (!mounted) return;
     setState(() {
       _cargando = false;
@@ -44,33 +77,38 @@ class _ProfilePageState extends State<ProfilePage> {
         return;
       }
       _error = null;
-      _usuario = r[0];
-      _perfil = r[1]['exito'] == true ? r[1] : null;
-      _stats = r[2]['exito'] == true ? (r[2]['datos'] as List? ?? []) : [];
+      _usuarioJson = r[0];
+      _usuario = Usuario.fromJson(r[0]);
+      _perfilJson = r[1]['exito'] == true ? r[1] : null;
+      _pj = pj;
+      _pe = pe;
+      _po = po;
+      _pa = pa;
     });
   }
 
   void _aviso(String texto) => ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(texto)));
 
-  int _suma(String campo) => _stats.fold<int>(0, (a, e) => a + ((e[campo] ?? 0) as num).toInt());
-
-  String _fecha(dynamic valor) {
-    final p = valor?.toString().split('T').first.split('-') ?? [];
-    return p.length == 3 ? '${p[2]}/${p[1]}/${p[0]}' : '-';
-  }
-
-  String _texto(dynamic valor) => (valor == null || valor.toString().trim().isEmpty) ? '-' : valor.toString();
+  String _fecha(DateTime? d) => d == null ? '-' : '${d.day.toString().padLeft(2, '0')}/${d.month.toString().padLeft(2, '0')}/${d.year}';
+  String _texto(String? valor) => (valor == null || valor.trim().isEmpty) ? '-' : valor;
 
   Future<void> _editar() async {
-    final guardado = await Navigator.push<bool>(context, MaterialPageRoute(builder: (_) => EditProfilePage(usuario: _usuario!, perfil: _perfil)));
+    final guardado = await Navigator.push<bool>(context, MaterialPageRoute(builder: (_) => EditProfilePage(usuario: _usuarioJson!, perfil: _perfilJson)));
     if (guardado == true && mounted) _cargar();
-
   }
 
   Future<void> _cambiarFoto() async {
-    if (_perfil == null) {
-      _aviso('Primero completa tu perfil de jugador');
-      return _editar();
+    if (_perfilJson == null) {
+      if (_rol == RolApp.jugador) {
+        _aviso('Primero completa tu perfil de jugador');
+        return _editar();
+      }
+      // Quien no es jugador no tiene perfil deportivo: se crea uno vacío solo para guardar la foto
+      final creado = await ProfileService.guardarPerfilJugador({}, existe: false);
+      if (creado['exito'] != true) return _aviso(creado['mensaje'].toString());
+      final nuevo = await ProfileService.perfilJugador();
+      if (nuevo['exito'] != true) return _aviso('No se pudo preparar tu perfil');
+      _perfilJson = nuevo;
     }
     final foto = await ImagePicker().pickImage(source: ImageSource.gallery, maxWidth: 1000, imageQuality: 85);
     if (foto == null) return;
@@ -81,7 +119,7 @@ class _ProfilePageState extends State<ProfilePage> {
     if (!mounted) return;
     setState(() {
       _subiendoFoto = false;
-      if (r['exito'] == true) _perfil = r['perfil'] as Map<String, dynamic>;
+      if (r['exito'] == true) _perfilJson = r['perfil'] as Map<String, dynamic>;
     });
     if (r['exito'] != true) _aviso(r['mensaje'].toString());
   }
@@ -97,7 +135,6 @@ class _ProfilePageState extends State<ProfilePage> {
       builder: (d) => AlertDialog(
         backgroundColor: AppColors.bgCard,
         title: const Text('Eliminar cuenta', style: TextStyle(color: AppColors.textWhite)),
-
         content: const Text('Tu cuenta se desactivará y no podrás volver a entrar con ella. Esta acción no se puede deshacer.', style: TextStyle(color: AppColors.textGray)),
         actions: [
           TextButton(onPressed: () => Navigator.pop(d, false), child: const Text('Cancelar')),
@@ -129,9 +166,16 @@ class _ProfilePageState extends State<ProfilePage> {
                   onRefresh: _cargar,
                   child: ListView(
                     physics: const AlwaysScrollableScrollPhysics(),
-                    padding: const EdgeInsets.fromLTRB(20, 8, 20, 32),
-
-                    children: [_cabecera, const SizedBox(height: 20), _estadisticas, const SizedBox(height: 24), _datosPersonales, const SizedBox(height: 20), _perfilJugador, const SizedBox(height: 24), _acciones],
+                    padding: const EdgeInsets.fromLTRB(20, 8, 20, 120),
+                    children: [
+                      _cabecera,
+                      const SizedBox(height: 20),
+                      ..._seccionesDelRol(),
+                      const SizedBox(height: 24),
+                      _datosPersonales,
+                      const SizedBox(height: 24),
+                      _acciones,
+                    ],
                   ),
                 ),
     );
@@ -154,17 +198,14 @@ class _ProfilePageState extends State<ProfilePage> {
   // ---- Cabecera: foto, nombre y rol ----
   Widget get _cabecera {
     final u = _usuario!;
-    final nombre = '${u['nombre'] ?? ''} ${u['apellido'] ?? ''}'.trim();
-    final url = _perfil?['avatar_url'] as String?;
-    final iniciales = nombre.isEmpty ? '?' : nombre.split(' ').take(2).map((p) => p[0].toUpperCase()).join();
+    final url = _perfil?.avatarUrl;
     return Column(children: [
       Stack(children: [
         CircleAvatar(
           radius: 52,
-          backgroundColor: AppColors.blue,
+          backgroundColor: _rol.color.withValues(alpha: 0.6),
           backgroundImage: url != null ? NetworkImage(url) : null,
-
-          child: url != null ? null : Text(iniciales, style: const TextStyle(fontSize: 32, color: AppColors.textWhite, fontWeight: FontWeight.bold)),
+          child: url != null ? null : Text(u.iniciales, style: const TextStyle(fontSize: 32, color: AppColors.textWhite, fontWeight: FontWeight.bold)),
         ),
         if (_subiendoFoto) const Positioned.fill(child: CircleAvatar(backgroundColor: Colors.black54, child: CircularProgressIndicator())),
         Positioned(
@@ -178,65 +219,140 @@ class _ProfilePageState extends State<ProfilePage> {
       ]),
       const SizedBox(height: 14),
       Row(mainAxisSize: MainAxisSize.min, children: [
-        Flexible(child: Text(nombre, textAlign: TextAlign.center, style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: AppColors.textWhite))),
-        if (_perfil?['verificado'] == true) ...[const SizedBox(width: 6), const Icon(Icons.verified, color: AppColors.primaryLight, size: 20)],
+        Flexible(child: Text(u.nombreCompleto, textAlign: TextAlign.center, style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: AppColors.textWhite))),
+        if (_perfil?.verificado == true) ...[const SizedBox(width: 6), const Icon(Icons.verified, color: AppColors.primaryLight, size: 20)],
       ]),
       const SizedBox(height: 8),
-      TournamentChip(rolesNombre[u['rol_id']] ?? 'Usuario', color: AppColors.secondary, icono: Icons.badge_outlined),
+      TournamentChip(_rol.nombre, color: _rol.color, icono: _rol.icono),
     ]);
   }
 
-  // ---- Estadísticas ----
-  Widget get _estadisticas => Row(children: [
-        _stat('${_stats.length}', 'Partidos'),
-        const SizedBox(width: 10),
-        _stat('${_suma('goles')}', 'Goles'),
-        const SizedBox(width: 10),
-        _stat('${_suma('asistencias')}', 'Asist.'),
-        const SizedBox(width: 10),
-        _stat('${_suma('tarjetas_amarillas') + _suma('tarjetas_rojas')}', 'Tarjetas'),
-      ]);
+  // ---- Contenido según el rol ----
+  List<Widget> _seccionesDelRol() => switch (_rol) {
+        RolApp.jugador => _jugador(),
+        RolApp.entrenador => _entrenador(),
+        RolApp.organizador => _organizador(),
+        RolApp.arbitro => _arbitro(),
+        RolApp.admin => [_accion(Icons.admin_panel_settings_outlined, 'Panel de administración', () => Navigator.push(context, MaterialPageRoute(builder: (_) => const AdminPage())), color: AppColors.secondary)],
+        _ => const [],
+      };
 
-
-  Widget _stat(String valor, String etiqueta) => Expanded(
-        child: Container(
-          padding: const EdgeInsets.symmetric(vertical: 14),
-          decoration: BoxDecoration(color: AppColors.bgCard, borderRadius: BorderRadius.circular(12)),
-          child: Column(children: [
-            Text(valor, style: const TextStyle(fontSize: 22, color: AppColors.textWhite, fontWeight: FontWeight.bold)),
-            const SizedBox(height: 2),
-            Text(etiqueta, style: const TextStyle(fontSize: 11, color: AppColors.textGray)),
-          ]),
+  List<Widget> _jugador() {
+    final p = _pj;
+    final e = p?.estadisticas ?? const EstadisticasJugador();
+    final perfil = _perfil;
+    final serie = p?.ultimosPartidos ?? const <EstadisticaPartido>[];
+    return [
+      KpiGrid([
+        KpiTile(icono: Icons.sports_soccer, valor: '${e.goles}', etiqueta: 'Goles', color: AppColors.orange, detalle: e.partidos == 0 ? null : '${e.golesPorPartido.toStringAsFixed(2)} por partido'),
+        KpiTile(icono: Icons.handshake_outlined, valor: '${e.asistencias}', etiqueta: 'Asistencias', color: AppColors.secondary),
+        KpiTile(icono: Icons.event_available, valor: '${e.partidos}', etiqueta: 'Partidos', color: AppColors.primaryLight, detalle: '${e.minutos} min jugados'),
+        KpiTile(icono: Icons.style, valor: '${e.tarjetas}', etiqueta: 'Tarjetas', color: AppColors.warning, detalle: '${e.amarillas} amarillas · ${e.rojas} rojas'),
+      ]),
+      const SeccionTitulo('Goles en los últimos partidos'),
+      TarjetaBase(
+        child: LineaTendencia(
+          valores: [for (final s in serie) s.goles],
+          etiquetas: [for (final s in serie) s.fecha == null ? '' : '${s.fecha!.day}/${s.fecha!.month}'],
         ),
-      );
+      ),
+      const SizedBox(height: 20),
+      _seccion('Perfil de jugador', perfil == null
+          ? [
+              const Padding(padding: EdgeInsets.only(top: 8), child: Text('Aún no tienes perfil de jugador. Complétalo para aparecer con tu posición y foto.', style: TextStyle(color: AppColors.textGray, fontSize: 13))),
+              TextButton(onPressed: _editar, child: const Text('Completar perfil', style: TextStyle(color: AppColors.secondary, fontWeight: FontWeight.bold))),
+            ]
+          : [
+              _fila(Icons.sports_soccer, 'Posición', _texto(perfil.posicion)),
+              _fila(Icons.flag_outlined, 'País', _texto(perfil.pais)),
+              _fila(Icons.person_search_outlined, 'Tipo de jugador', _texto(perfil.tipoJugador)),
+              if (perfil.distincion != null) _fila(Icons.emoji_events_outlined, 'Distinción', perfil.distincion!),
+            ]),
+    ];
+  }
+
+  List<Widget> _entrenador() {
+    final p = _pe;
+    if (p == null) return const [];
+    return [
+      KpiGrid([
+        KpiTile(icono: Icons.groups, valor: '${p.totalEquipos}', etiqueta: 'Equipos', color: AppColors.orange),
+        KpiTile(icono: Icons.person, valor: '${p.totalJugadores}', etiqueta: 'Jugadores', color: AppColors.secondary),
+        KpiTile(icono: Icons.emoji_events, valor: '${p.torneosActivos}', etiqueta: 'Torneos activos', color: AppColors.success),
+        KpiTile(icono: Icons.hourglass_top, valor: '${p.inscripcionesPendientes}', etiqueta: 'Inscripciones pendientes', color: AppColors.warning),
+      ]),
+      if (p.equipos.isNotEmpty) ...[
+        const SeccionTitulo('Equipos que dirijo'),
+        for (final e in p.equipos)
+          Padding(
+            padding: const EdgeInsets.only(bottom: 8),
+            child: TarjetaBase(
+              padding: const EdgeInsets.all(12),
+              child: Row(children: [
+                EquipoAvatar(nombre: e.nombre, logoUrl: e.logoUrl),
+                const SizedBox(width: 12),
+                Expanded(child: Text(e.nombre, style: const TextStyle(color: AppColors.textWhite, fontWeight: FontWeight.w600))),
+                Text('${e.jugadores} jugadores', style: const TextStyle(fontSize: 12, color: AppColors.textGray)),
+              ]),
+            ),
+          ),
+      ],
+    ];
+  }
+
+  List<Widget> _organizador() {
+    final p = _po;
+    if (p == null) return const [];
+    return [
+      KpiGrid([
+        KpiTile(icono: Icons.emoji_events, valor: '${p.totalTorneos}', etiqueta: 'Torneos organizados', color: AppColors.primaryLight),
+        KpiTile(icono: Icons.groups, valor: '${p.totalEquipos}', etiqueta: 'Equipos participando', color: AppColors.orange),
+        KpiTile(icono: Icons.today, valor: '${p.partidosHoy}', etiqueta: 'Partidos hoy', color: AppColors.success),
+        KpiTile(icono: Icons.date_range, valor: '${p.partidosSemana}', etiqueta: 'Esta semana', color: AppColors.secondary),
+      ]),
+      if (p.torneos.isNotEmpty) ...[
+        const SeccionTitulo('Avance de mis torneos'),
+        TarjetaBase(
+          child: BarrasVerticales(
+            datos: [for (final t in p.torneos.take(6)) BarraDato(t.torneo.nombre.length > 8 ? '${t.torneo.nombre.substring(0, 7)}…' : t.torneo.nombre, (t.avance * 100).round())],
+            color: AppColors.primaryLight,
+          ),
+        ),
+        const Padding(padding: EdgeInsets.only(top: 6), child: Text('Porcentaje de partidos jugados por torneo', style: TextStyle(fontSize: 11, color: AppColors.textGrayDark))),
+      ],
+    ];
+  }
+
+  List<Widget> _arbitro() {
+    final p = _pa;
+    if (p == null) return const [];
+    final tarjetas = [
+      SegmentoDonut('Amarillas', p.amarillas, AppColors.warning),
+      SegmentoDonut('Rojas', p.rojas, AppColors.error),
+    ];
+    return [
+      KpiGrid([
+        KpiTile(icono: Icons.sports_score, valor: '${p.dirigidos}', etiqueta: 'Partidos dirigidos', color: AppColors.warning),
+        KpiTile(icono: Icons.upcoming, valor: '${p.porDirigir}', etiqueta: 'Por dirigir', color: AppColors.primaryLight),
+        KpiTile(icono: Icons.sports_soccer, valor: '${p.goles}', etiqueta: 'Goles en mis partidos', color: AppColors.orange),
+        KpiTile(icono: Icons.style, valor: '${p.tarjetas}', etiqueta: 'Tarjetas mostradas', color: AppColors.error),
+      ]),
+      if (p.tarjetas > 0) ...[
+        const SeccionTitulo('Disciplina en mis partidos'),
+        TarjetaBase(child: Row(children: [DonutChart(segmentos: tarjetas, centro: '${p.tarjetas}', subcentro: 'tarjetas', tamano: 110), const SizedBox(width: 20), Expanded(child: LeyendaChart(tarjetas))])),
+      ],
+    ];
+  }
 
   // ---- Secciones de datos ----
   Widget get _datosPersonales {
     final u = _usuario!;
     return _seccion('Información personal', [
-      _fila(Icons.email_outlined, 'Correo', _texto(u['correo']),
-          extra: TournamentChip(u['correo_verificado'] == true ? 'Verificado' : 'Sin verificar', color: u['correo_verificado'] == true ? AppColors.success : AppColors.warning)),
-      _fila(Icons.phone_outlined, 'Celular', _texto(u['numero_celular'])),
-      _fila(Icons.cake_outlined, 'Nacimiento', _fecha(u['fecha_nacimiento'])),
-      _fila(Icons.location_on_outlined, 'Departamento', _texto(u['ciudad'])),
-      _fila(Icons.trending_up, 'Nivel de juego', _texto(u['nivel_juego'])),
-    ]);
-  }
-
-  Widget get _perfilJugador {
-    final p = _perfil;
-    if (p == null) {
-      return _seccion('Perfil de jugador', [
-        const Text('Aún no tienes perfil de jugador. Complétalo para aparecer con tu posición y foto.', style: TextStyle(color: AppColors.textGray, fontSize: 13)),
-        TextButton(onPressed: _editar, child: const Text('Completar perfil', style: TextStyle(color: AppColors.secondary, fontWeight: FontWeight.bold))),
-
-      ]);
-    }
-    return _seccion('Perfil de jugador', [
-      _fila(Icons.sports_soccer, 'Posición', _texto(p['posicion'])),
-      _fila(Icons.flag_outlined, 'País', _texto(p['pais'])),
-      _fila(Icons.person_search_outlined, 'Tipo de jugador', _texto(p['tipo_jugador'])),
-      if (p['distincion'] != null && p['distincion'].toString().isNotEmpty) _fila(Icons.emoji_events_outlined, 'Distinción', p['distincion'].toString()),
+      _fila(Icons.email_outlined, 'Correo', _texto(u.correo), extra: TournamentChip(u.correoVerificado ? 'Verificado' : 'Sin verificar', color: u.correoVerificado ? AppColors.success : AppColors.warning)),
+      _fila(Icons.phone_outlined, 'Celular', _texto(u.celular)),
+      _fila(Icons.cake_outlined, 'Nacimiento', _fecha(u.fechaNacimiento)),
+      _fila(Icons.location_on_outlined, 'Departamento', _texto(u.ciudad)),
+      if (_rol == RolApp.jugador) _fila(Icons.trending_up, 'Nivel de juego', _texto(u.nivelJuego)),
     ]);
   }
 
@@ -262,10 +378,8 @@ class _ProfilePageState extends State<ProfilePage> {
         ]),
       );
 
-
   // ---- Acciones ----
   Widget get _acciones => Column(children: [
-        if (_usuario?['rol_id'] == 6) _accion(Icons.admin_panel_settings_outlined, 'Panel de administración', () => Navigator.push(context, MaterialPageRoute(builder: (_) => const AdminPage())), color: AppColors.secondary),
         _accion(Icons.edit_outlined, 'Editar perfil', _editar),
         _accion(Icons.lock_outline, 'Cambiar contraseña', () => Navigator.push(context, MaterialPageRoute(builder: (_) => const ChangePasswordPage()))),
         _accion(Icons.logout, 'Cerrar sesión', _cerrarSesion),

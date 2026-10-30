@@ -39,7 +39,10 @@ export const resumen = async (req, res) => {
   try {
     const hace7 = new Date(Date.now() - 7 * 24 * 3600 * 1000).toISOString();
     const roles = Object.values(ROLES);
-    const [total, activos, nuevos, torneos, equipos, pendientes, partidos, enVivo, finalizados, porRol, estados, marcadores] = await Promise.all([
+    const desdeMeses = new Date();
+    desdeMeses.setDate(1);
+    desdeMeses.setMonth(desdeMeses.getMonth() - 5); // 6 meses contando el actual
+    const [total, activos, nuevos, torneos, equipos, pendientes, partidos, enVivo, finalizados, porRol, estados, marcadores, registros, estadosPartidos, estadosInscripcion, listaTorneos] = await Promise.all([
       contar('usuarios'),
       contar('usuarios', (q) => q.eq('activo', true)),
       contar('usuarios', (q) => q.gte('creado_en', hace7)),
@@ -51,8 +54,33 @@ export const resumen = async (req, res) => {
       contar('eventos_calendario', (q) => q.eq('tipo', 'Partido').eq('estado', 'Finalizado')),
       Promise.all(roles.map((rol) => contar('usuarios', (q) => q.eq('rol_id', rol)))),
       supabase.from('torneos').select('estado').limit(5000).then(datos),
-      supabase.from('eventos_calendario').select('resultado_local, resultado_visitante').eq('tipo', 'Partido').eq('estado', 'Finalizado').limit(10000).then(datos),
+      supabase.from('eventos_calendario').select('torneo_id, resultado_local, resultado_visitante').eq('tipo', 'Partido').eq('estado', 'Finalizado').limit(10000).then(datos),
+      supabase.from('usuarios').select('creado_en').gte('creado_en', desdeMeses.toISOString()).limit(10000).then(datos),
+      supabase.from('eventos_calendario').select('estado').eq('tipo', 'Partido').limit(10000).then(datos),
+      supabase.from('inscripciones_equipo').select('estado').limit(10000).then(datos),
+      supabase.from('torneos').select('id, nombre').limit(5000).then(datos),
     ]);
+
+    // Series para los gráficos del panel
+    const mes = (iso) => String(iso).slice(0, 7);
+    const meses = Array.from({ length: 6 }, (_, i) => {
+      const d = new Date(desdeMeses);
+      d.setMonth(d.getMonth() + i);
+      return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+    });
+    const usuariosPorMes = meses.map((m) => ({ mes: m, total: registros.filter((r) => mes(r.creado_en) === m).length }));
+    const nombreTorneo = Object.fromEntries(listaTorneos.map((t) => [String(t.id), t.nombre]));
+    const porTorneo = marcadores.reduce((acc, m) => {
+      const clave = String(m.torneo_id);
+      acc[clave] ??= { goles: 0, partidos: 0 };
+      acc[clave].goles += (m.resultado_local ?? 0) + (m.resultado_visitante ?? 0);
+      acc[clave].partidos += 1;
+      return acc;
+    }, {});
+    const golesPorTorneo = Object.entries(porTorneo)
+      .map(([id, v]) => ({ nombre: nombreTorneo[id] ?? 'Torneo', ...v }))
+      .sort((a, b) => b.goles - a.goles)
+      .slice(0, 5);
 
     res.json({
       usuarios: { total, activos, nuevos7d: nuevos, porRol: Object.fromEntries(roles.map((rol, i) => [rol, porRol[i]])) },
@@ -61,6 +89,12 @@ export const resumen = async (req, res) => {
       inscripcionesPendientes: pendientes,
       partidos: { total: partidos, finalizados, enVivo },
       goles: marcadores.reduce((suma, m) => suma + (m.resultado_local ?? 0) + (m.resultado_visitante ?? 0), 0),
+      series: {
+        usuariosPorMes,
+        partidosPorEstado: agrupar(estadosPartidos, 'estado'),
+        inscripcionesPorEstado: agrupar(estadosInscripcion, 'estado'),
+        golesPorTorneo,
+      },
     });
   } catch (error) {
     fallo(res, error, 'Error al calcular el resumen');

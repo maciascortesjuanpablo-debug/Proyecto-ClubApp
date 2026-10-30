@@ -137,10 +137,12 @@ export const misEventos = async (req, res) => {
     }
 
     const uid = req.usuario.id;
+    // Cada rol ve solo lo suyo: jugador y entrenador, sus equipos; árbitro, sus designaciones; organizador, sus torneos
+    const rol = req.usuario.rol_id;
     const [equipos, arbitrajes, torneos] = await Promise.all([
-      equiposDelUsuario(uid),
-      calendarioModel.eventosDeArbitro(uid),
-      req.usuario.rol_id === ROLES.ORGANIZADOR
+      rol === ROLES.JUGADOR || rol === ROLES.ENTRENADOR ? equiposDelUsuario(uid) : [],
+      rol === ROLES.ARBITRO ? calendarioModel.eventosDeArbitro(uid) : [],
+      rol === ROLES.ORGANIZADOR
         ? supabase.from('torneos').select('id').eq('organizador_id', uid).then(datos)
         : [],
     ]);

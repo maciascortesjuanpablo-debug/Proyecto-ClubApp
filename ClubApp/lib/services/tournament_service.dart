@@ -1,7 +1,10 @@
 import 'dart:convert';
 import 'package:http/http.dart' as http;
 import '../config/api_config.dart';
+import '../models/models.dart';
+import 'api_client.dart';
 import 'auth_service.dart';
+import 'resultado.dart';
 
 class TournamentService {
   static const _timeout = Duration(seconds: 12);
@@ -55,4 +58,41 @@ class TournamentService {
       return {'exito': false, 'mensaje': 'No se pudo conectar al servidor'};
     }
   }
+
+  // ---- Detalle de un torneo (público) ----
+  static Future<Resultado<ResumenTorneo>> resumen(Object id) async {
+    final r = await ApiClient.pedir('GET', '/torneos/$id/resumen');
+    return r['exito'] == true ? Resultado.ok(ResumenTorneo.fromJson(r)) : Resultado.fallo(r['mensaje'].toString());
+  }
+
+  static Future<Resultado<List<FilaPosicion>>> tabla(Object id) async {
+    final r = await ApiClient.pedir('GET', '/inscripciones/tabla-posiciones/$id');
+    return r['exito'] == true ? Resultado.ok(toLista(r['datos']).map(FilaPosicion.fromJson).toList()) : Resultado.fallo(r['mensaje'].toString());
+  }
+
+  /// Todos los eventos del torneo (partidos y otros), de más antiguo a más reciente
+  static Future<Resultado<List<Partido>>> eventos(Object id) async {
+    final r = await ApiClient.pedir('GET', '/calendario/eventos/torneo/$id');
+    if (r['exito'] != true) return Resultado.fallo(r['mensaje'].toString());
+    final lista = toLista(r['datos']).map(Partido.fromJson).toList();
+    lista.sort((a, b) => '${a.diaIso} ${a.hora}'.compareTo('${b.diaIso} ${b.hora}'));
+    return Resultado.ok(lista);
+  }
+
+  static Future<Resultado<List<Inscripcion>>> inscripciones(Object id) async {
+    final r = await ApiClient.pedir('GET', '/inscripciones/torneo/$id');
+    return r['exito'] == true ? Resultado.ok(toLista(r['datos']).map(Inscripcion.fromJson).toList()) : Resultado.fallo(r['mensaje'].toString());
+  }
+
+  /// Organizador del torneo o admin: aceptar o rechazar una inscripción
+  static Future<Map<String, dynamic>> resolverInscripcion(Object id, String estado) => ApiClient.pedir('PUT', '/inscripciones/$id/estado', cuerpo: {'estado': estado});
+
+  /// Torneos de gestión: los propios del organizador (o todos si es admin)
+  static Future<Resultado<List<Torneo>>> gestionables() async {
+    final admin = AuthService.usuario?['rol_id'] == 6;
+    final r = await ApiClient.pedir('GET', admin ? '/torneos' : '/torneos/organizador/${AuthService.usuario?['id']}');
+    return r['exito'] == true ? Resultado.ok(toLista(r['datos']).map(Torneo.fromJson).toList()) : Resultado.fallo(r['mensaje'].toString());
+  }
+
+  static Future<Map<String, dynamic>> cambiarEstado(Object id, String estado) => ApiClient.pedir('PUT', '/torneos/$id', cuerpo: {'estado': estado});
 }
