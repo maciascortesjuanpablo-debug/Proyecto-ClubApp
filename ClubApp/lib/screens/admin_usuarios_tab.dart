@@ -30,7 +30,6 @@ class _AdminUsuariosTabState extends State<AdminUsuariosTab> with AutomaticKeepA
   @override
   void initState() {
     super.initState();
-
     _cargar();
   }
 
@@ -64,7 +63,6 @@ class _AdminUsuariosTabState extends State<AdminUsuariosTab> with AutomaticKeepA
     });
   }
 
-
   void _filtrar(VoidCallback cambio) {
     setState(cambio);
     _cargar();
@@ -96,7 +94,6 @@ class _AdminUsuariosTabState extends State<AdminUsuariosTab> with AutomaticKeepA
             hintStyle: const TextStyle(color: AppColors.textGray, fontSize: 13),
             prefixIcon: const Icon(Icons.search, color: AppColors.textGray),
             suffixIcon: IconButton(icon: const Icon(Icons.arrow_forward, color: AppColors.secondary), onPressed: _cargar),
-
             filled: true,
             fillColor: AppColors.bgCard,
             contentPadding: const EdgeInsets.symmetric(vertical: 12),
@@ -129,7 +126,6 @@ class _AdminUsuariosTabState extends State<AdminUsuariosTab> with AutomaticKeepA
           Center(
             child: _cargandoMas
                 ? const Padding(padding: EdgeInsets.all(12), child: CircularProgressIndicator())
-
                 : TextButton(onPressed: () => _cargar(mas: true), child: const Text('Cargar más', style: TextStyle(color: AppColors.secondary, fontWeight: FontWeight.bold))),
           ),
       ],

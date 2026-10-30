@@ -30,7 +30,6 @@ class _AdminInscripcionesTabState extends State<AdminInscripcionesTab> with Auto
     if (!mounted) return;
     setState(() {
       _cargando = false;
-
       _error = r['exito'] == true ? null : r['mensaje'].toString();
       if (r['exito'] == true) _items = (r['inscripciones'] as List).cast<Map<String, dynamic>>();
     });
@@ -63,7 +62,6 @@ class _AdminInscripcionesTabState extends State<AdminInscripcionesTab> with Auto
           valor: _estado,
           onChanged: (v) {
             setState(() {
-
               _estado = v ?? 'Pendiente';
               _cargando = true;
             });

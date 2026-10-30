@@ -18,6 +18,7 @@ const _roles = {
 };
 
 
+
 class RegisterPage2 extends StatefulWidget {
   final String nombre;
   final String apellido;

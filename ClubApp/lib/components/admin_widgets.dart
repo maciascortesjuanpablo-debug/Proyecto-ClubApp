@@ -31,7 +31,6 @@ class AdminCuerpo extends StatelessWidget {
 
   const AdminCuerpo({super.key, required this.cargando, required this.error, required this.onRefresh, required this.hijos, this.encabezado, this.vacio = 'Sin resultados'});
 
-
   @override
   Widget build(BuildContext context) {
     if (cargando) return const Center(child: CircularProgressIndicator());
@@ -63,7 +62,6 @@ class AdminCuerpo extends StatelessWidget {
 class AdminTarjeta extends StatelessWidget {
   final Widget? leading;
   final String titulo;
-
   final String? subtitulo;
   final List<Widget> chips;
   final Widget? trailing;
@@ -96,7 +94,6 @@ class AdminTarjeta extends StatelessWidget {
             ),
           ),
         ),
-
       );
 }
 
@@ -128,7 +125,6 @@ class FiltroChips<T> extends StatelessWidget {
         ]),
       );
 }
-
 
 /// Gráfico de barras horizontales sencillo (etiqueta, barra, cantidad)
 class AdminBarras extends StatelessWidget {
@@ -162,7 +158,6 @@ class AdminBarras extends StatelessWidget {
               ),
               SizedBox(width: 36, child: Text('${e.value}', textAlign: TextAlign.end, style: const TextStyle(fontSize: 12, color: AppColors.textWhite, fontWeight: FontWeight.bold))),
             ]),
-
           ),
       ]),
     );
