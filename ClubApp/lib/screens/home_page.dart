@@ -14,6 +14,7 @@ import '../components/home/tournaments_preview.dart';
 import '../services/auth_service.dart';
 import '../services/home_services.dart';
 import 'login_page.dart';
+import 'notificaciones_page.dart';
 import 'register_page_1.dart';
 
 class HomePage extends StatefulWidget {
@@ -81,7 +82,7 @@ class _HomePageState extends State<HomePage> {
               noLeidas: (d?['notificacionesNoLeidas'] ?? 0) as int,
               onLogin: () => _push(const LoginPage()),
               onBuscar: () => _pronto('Búsqueda'),
-              onNotificaciones: () => _pronto('Notificaciones'),
+              onNotificaciones: () => _push(const NotificacionesPage()),
             ),
             if (_cargando)
               const Padding(padding: EdgeInsets.all(60), child: Center(child: CircularProgressIndicator()))
