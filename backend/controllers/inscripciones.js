@@ -24,7 +24,7 @@ export const inscribirEquipo = async (req, res) => {
     }
 
     const inscripcion = await inscripcionModel.inscribirEquipo({ torneo_id, equipo_id });
-    if (torneo.organizador_id) await notificar(torneo.organizador_id, `El equipo "${equipo.nombre}" solicitó inscribirse en "${torneo.nombre}"`);
+    if (torneo.organizador_id) await notificar(torneo.organizador_id, `El equipo "${equipo.nombre}" solicitó inscribirse en "${torneo.nombre}"`, { tipo: 'torneo', referencia_id: torneo.id });
     res.status(201).json({ mensaje: 'Equipo inscrito, pendiente de aprobación', inscripcion });
   } catch (error) {
     fallo(res, error, 'Error al inscribir el equipo');
@@ -62,7 +62,7 @@ export const actualizarEstadoInscripcion = async (req, res) => {
 
     if (estado !== actual.estado && estado !== 'Pendiente') {
       const equipo = await equipoModel.buscarPorId(actual.equipo_id);
-      if (equipo?.creado_por) await notificar(equipo.creado_por, `Tu equipo "${equipo.nombre}" fue ${estado.toLowerCase()} en "${torneo.nombre}"`);
+      if (equipo?.creado_por) await notificar(equipo.creado_por, `Tu equipo "${equipo.nombre}" fue ${estado.toLowerCase()} en "${torneo.nombre}"`, { tipo: 'torneo', referencia_id: torneo.id });
     }
 
     res.json({ mensaje: 'Estado actualizado', inscripcion });
@@ -103,7 +103,7 @@ export const crearInvitacion = async (req, res) => {
     }
 
     const invitacion = await inscripcionModel.crearInvitacion({ equipo_id, usuario_id, posicion_propuesta, invitado_por: req.usuario.id });
-    await notificar(usuario_id, `El equipo "${equipo.nombre}" te invitó a unirte`);
+    await notificar(usuario_id, `El equipo "${equipo.nombre}" te invitó a unirte`, { tipo: 'invitacion', referencia_id: equipo_id });
     res.status(201).json({ mensaje: 'Invitación enviada', invitacion });
   } catch (error) {
     fallo(res, error, 'Error al crear la invitación');
@@ -145,7 +145,7 @@ export const responderInvitacion = async (req, res) => {
 
     if (invitacion.invitado_por) {
       const equipo = await equipoModel.buscarPorId(invitacion.equipo_id);
-      await notificar(invitacion.invitado_por, `Tu invitación a "${equipo?.nombre ?? 'tu equipo'}" fue ${respuesta.toLowerCase()}`);
+      await notificar(invitacion.invitado_por, `Tu invitación a "${equipo?.nombre ?? 'tu equipo'}" fue ${respuesta.toLowerCase()}`, { tipo: 'equipo', referencia_id: invitacion.equipo_id });
     }
     res.json({ mensaje: `Invitación ${respuesta.toLowerCase()}` });
   } catch (error) {

@@ -2,6 +2,7 @@ export 'admin_resumen.dart';
 export 'equipo.dart';
 export 'estadistica.dart';
 export 'json_utils.dart';
+export 'notificacion.dart';
 export 'paneles.dart';
 export 'partido.dart';
 export 'posicion.dart';

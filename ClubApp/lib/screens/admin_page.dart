@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../core/app_colors.dart';
+import '../components/campana_notificaciones.dart';
 import '../services/auth_service.dart';
 import 'admin_equipos_tab.dart';
 import 'admin_inscripciones_tab.dart';
@@ -28,6 +29,7 @@ class AdminPage extends StatelessWidget {
           backgroundColor: AppColors.bgDark,
           elevation: 0,
           title: const Text('Panel de administración'),
+          actions: const [CampanaNotificaciones()],
           bottom: const TabBar(
             isScrollable: true,
 

@@ -5,6 +5,7 @@ import { inscripcionModel } from '../models/inscripciones.js';
 import { FECHA_RE, HORA_RE, ROLES, ahora, datos, entero, esAdmin, fallo, pick, texto } from '../utils/helpers.js';
 import { esOrganizadorTorneo } from '../utils/permisos.js';
 import { recalcularSeguro } from '../utils/posiciones.js';
+import { avisarArbitro, avisarCambioPartido, avisarPartidoProgramado } from '../utils/avisos.js';
 
 const ESTADOS = ['Programado', 'En vivo', 'Finalizado', 'Aplazado', 'Cancelado'];
 const CAMPOS_AGENDA = ['fecha', 'hora', 'lugar_id', 'equipo_local_id', 'equipo_visitante_id'];
@@ -190,6 +191,7 @@ export const crearEvento = async (req, res) => {
     if (choque) return res.status(409).json({ mensaje: choque });
 
     const evento = await calendarioModel.crearEvento({ torneo_id, tipo, equipo_local_id, equipo_visitante_id, fecha, hora, lugar_id });
+    avisarPartidoProgramado(evento, req.usuario.id); // NOTIFICACIONES: sin await, el aviso no hace esperar la respuesta
     res.status(201).json({ mensaje: 'Evento creado', evento });
   } catch (error) {
     fallo(res, error, 'Error al crear el evento');
@@ -253,6 +255,7 @@ export const actualizarEvento = async (req, res) => {
 
     const evento = await calendarioModel.actualizar(req.params.id, cambios);
     await recalcularSeguro(req.evento.torneo_id); // los resultados cambian la tabla de posiciones
+    avisarCambioPartido(req.evento, evento, req.usuario.id); // NOTIFICACIONES: reprogramado, cancelado, en vivo, resultado
     res.json({ mensaje: 'Evento actualizado', evento });
   } catch (error) {
     fallo(res, error, 'Error al actualizar el evento');
@@ -285,6 +288,7 @@ export const registrarResultado = async (req, res) => {
 
     const actualizado = await calendarioModel.actualizar(evento.id, cambios);
     await recalcularSeguro(evento.torneo_id); // la tabla de posiciones se actualiza sola
+    avisarCambioPartido(evento, actualizado, req.usuario.id); // NOTIFICACIONES: en vivo / resultado final
     res.json({ mensaje: 'Resultado registrado', evento: actualizado });
   } catch (error) {
     fallo(res, error, 'Error al registrar el resultado');
@@ -321,6 +325,7 @@ export const asignarArbitro = async (req, res) => {
       return res.status(409).json({ mensaje: 'Ese árbitro ya está asignado al evento' });
     }
     const arbitro = await calendarioModel.asignarArbitro({ evento_id: req.params.id, usuario_id, rol_arbitraje: rol_arbitraje || 'Principal' });
+    avisarArbitro(req.evento ?? (await calendarioModel.buscarPorId(req.params.id)), usuario_id, rol_arbitraje || 'Principal', req.usuario.id); // NOTIFICACIONES: avisa al árbitro
     res.status(201).json({ mensaje: 'Árbitro asignado', arbitro });
   } catch (error) {
     fallo(res, error, 'Error al asignar el árbitro');

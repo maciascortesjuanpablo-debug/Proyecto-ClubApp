@@ -2,20 +2,27 @@ import 'package:flutter/material.dart';
 import '../core/app_colors.dart';
 import '../screens/scout_page.dart';
 import '../services/auth_service.dart';
+import '../services/notification_service.dart';
 
 /// Clave del navegador principal: la burbuja vive por encima del Navigator y necesita abrir pantallas desde fuera de él.
 final GlobalKey<NavigatorState> navigatorKey = GlobalKey<NavigatorState>();
 
-/// Avisa a la burbuja cada vez que cambia la pantalla (para volver a evaluar si hay sesión).
+/// Avisa cada vez que cambia la pantalla: la burbuja vuelve a evaluar si hay sesión y,
+/// con sesión, las notificaciones empiezan a consultarse (sin sesión se detienen).
 class ScoutObserver extends NavigatorObserver {
+  void _cambio() {
+    ScoutBurbuja.refrescar();
+    NotificationService.evaluarSesion();
+  }
+
   @override
-  void didPush(Route route, Route? previousRoute) => ScoutBurbuja.refrescar();
+  void didPush(Route route, Route? previousRoute) => _cambio();
   @override
-  void didPop(Route route, Route? previousRoute) => ScoutBurbuja.refrescar();
+  void didPop(Route route, Route? previousRoute) => _cambio();
   @override
-  void didRemove(Route route, Route? previousRoute) => ScoutBurbuja.refrescar();
+  void didRemove(Route route, Route? previousRoute) => _cambio();
   @override
-  void didReplace({Route? newRoute, Route? oldRoute}) => ScoutBurbuja.refrescar();
+  void didReplace({Route? newRoute, Route? oldRoute}) => _cambio();
 }
 
 /// Burbuja de chat con Scout AI, visible en todas las pantallas para quien tiene sesión (de cualquier rol).

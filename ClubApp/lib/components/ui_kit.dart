@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../core/app_colors.dart';
 import '../services/resultado.dart';
+import 'campana_notificaciones.dart';
 
 /// Piezas visuales comunes a las pantallas de todos los roles.
 
@@ -217,6 +218,7 @@ class CabeceraRol extends StatelessWidget {
               Text(subtitulo, style: const TextStyle(fontSize: 12.5, color: AppColors.textGray)),
             ]),
           ),
+          const CampanaNotificaciones(), // notificaciones: contador y acceso a la lista
         ]),
       );
 }
