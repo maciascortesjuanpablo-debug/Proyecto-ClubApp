@@ -3,8 +3,10 @@ import {
   crearEquipo, obtenerEquipos, obtenerEquipoPorId, actualizarEquipo, eliminarEquipo, equipoPropio,
   agregarJugadorEquipo, obtenerPlantilla, actualizarJugadorEquipo, eliminarJugadorEquipo,
   agregarStaffEquipo, obtenerStaffEquipo, eliminarStaffEquipo, misEquipos, partidosDeEquipo, buscarJugadores,
+  actualizarLogoEquipo, guardarAlineacion,
 } from '../controllers/equipos.js';
 import { verificarToken, verificarRol } from '../middlewares/middlewares.js';
+import { uploadLogoEquipo } from '../middlewares/upload.js';
 import { ROLES } from '../utils/helpers.js';
 
 const { ENTRENADOR, JUGADOR, ADMIN } = ROLES;
@@ -21,6 +23,8 @@ router.get('/:id/partidos', partidosDeEquipo);
 router.get('/:id', obtenerEquipoPorId);
 router.put('/:id', ...gestion, actualizarEquipo);
 router.delete('/:id', ...gestion, eliminarEquipo);
+router.put('/:id/logo', ...gestion, uploadLogoEquipo.single('logo'), actualizarLogoEquipo); // la autorización va ANTES de subir la imagen
+router.put('/:id/alineacion', ...gestion, guardarAlineacion);
 
 router.post('/:id/jugadores', ...gestion, agregarJugadorEquipo);
 router.get('/:id/jugadores', obtenerPlantilla);

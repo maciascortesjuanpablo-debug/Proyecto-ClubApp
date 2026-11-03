@@ -48,14 +48,14 @@ export const panelModel = {
     ]);
     const ids = [...new Set([...staff.map((s) => s.equipo_id), ...creados.map((c) => c.id)])];
     if (!ids.length) return [];
-    return datos(await supabase.from('equipos').select('id, nombre, logo_url, creado_por').in('id', ids).order('nombre'));
+    return datos(await supabase.from('equipos').select('*').in('id', ids).order('nombre'));
   },
 
   // Equipos donde juega un jugador, con su posición y dorsal
   async equiposDeJugador(usuario_id) {
     const filas = datos(await supabase
       .from('equipo_jugadores')
-      .select('posicion, dorsal, es_titular, estado_convocatoria, equipos ( id, nombre, logo_url )')
+      .select('posicion, dorsal, es_titular, estado_convocatoria, equipos ( * )')
       .eq('usuario_id', usuario_id));
     return filas.filter((f) => f.equipos).map((f) => ({
       ...f.equipos, posicion: f.posicion, dorsal: f.dorsal, es_titular: f.es_titular, estado_convocatoria: f.estado_convocatoria,

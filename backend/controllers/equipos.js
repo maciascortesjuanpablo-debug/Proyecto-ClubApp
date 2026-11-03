@@ -3,6 +3,7 @@ import { equipoModel } from '../models/equipos.js';
 import { panelModel } from '../models/panel.js';
 import { ROLES, datos, fallo, pick, texto } from '../utils/helpers.js';
 import { esDuenoEquipo } from '../utils/permisos.js';
+import { eliminarImagen } from '../utils/cloudinaryutils.js';
 
 // Middleware: carga el equipo de :id y exige que el usuario sea su dueño (o Admin)
 export const equipoPropio = async (req, res, next) => {
@@ -17,22 +18,68 @@ export const equipoPropio = async (req, res, next) => {
   }
 };
 
+
+// ---- FICHA DEL EQUIPO ----
+const FORMATOS = ['Fútbol 11', 'Fútbol 7', 'Fútbol 5', 'Fútbol sala'];
+
+// Valida y limpia los campos opcionales de la ficha. Devuelve { campos } o { error }.
+const camposEquipo = (body) => {
+  const campos = {};
+  for (const [clave, largo] of [['eslogan', 120], ['descripcion', 500], ['ciudad', 80]]) {
+    if (body[clave] !== undefined) campos[clave] = texto(body[clave], largo) || null;
+  }
+  if (body.formato !== undefined && body.formato !== null && body.formato !== '') {
+    if (!FORMATOS.includes(body.formato)) return { error: 'Formato de juego no válido' };
+    campos.formato = body.formato;
+  }
+  if (body.formacion !== undefined && body.formacion !== null && body.formacion !== '') {
+    if (!/^[1-9](-[1-9]){1,4}$/.test(String(body.formacion))) return { error: 'Formación no válida (ej. 4-4-2)' };
+    campos.formacion = String(body.formacion);
+  }
+  if (body.max_jugadores !== undefined && body.max_jugadores !== null && body.max_jugadores !== '') {
+    const n = Number(body.max_jugadores);
+    if (!Number.isInteger(n) || n < 1 || n > 60) return { error: 'La cantidad de jugadores debe estar entre 1 y 60' };
+    campos.max_jugadores = n;
+  }
+  if (body.color_principal !== undefined && body.color_principal !== null && body.color_principal !== '') {
+    if (!/^#[0-9a-fA-F]{6}$/.test(String(body.color_principal))) return { error: 'Color no válido (ej. #1E88E5)' };
+    campos.color_principal = String(body.color_principal);
+  }
+  return { campos };
+};
+
+// ¿La plantilla ya alcanzó el cupo definido por el entrenador? (sin cupo = sin límite)
+export const plantillaLlena = async (equipo) => {
+  if (!equipo?.max_jugadores) return false;
+  const actual = (await panelModel.contarJugadores([equipo.id]))[equipo.id] ?? 0;
+  return actual >= equipo.max_jugadores;
+};
+
 export const crearEquipo = async (req, res) => {
   try {
     const nombre = texto(req.body.nombre, 80);
     if (!nombre) return res.status(400).json({ mensaje: 'El nombre del equipo es obligatorio' });
 
-    const nuevo = { nombre, logo_url: req.body.logo_url };
+    const ficha = camposEquipo(req.body);
+    if (ficha.error) return res.status(400).json({ mensaje: ficha.error });
+    const basico = { nombre, logo_url: req.body.logo_url };
     let equipo;
+    let aviso;
     try {
-      equipo = await equipoModel.crear({ ...nuevo, creado_por: req.usuario.id });
+      equipo = await equipoModel.crear({ ...basico, ...ficha.campos, creado_por: req.usuario.id });
     } catch (error) {
-      // Columna `creado_por` aún no creada: ejecuta backend/sql/001_propietarios.sql
-      if (!/creado_por/.test(error.message)) throw error;
-      console.warn('⚠️  Falta la columna equipos.creado_por (ver backend/sql/001_propietarios.sql)');
-      equipo = await equipoModel.crear(nuevo);
+      // Faltan columnas: ejecuta backend/sql/001_propietarios.sql y backend/sql/002_equipos_ampliado.sql
+      if (!/creado_por|eslogan|descripcion|ciudad|formato|formacion|max_jugadores|color_principal|schema cache/.test(error.message)) throw error;
+      console.warn('⚠️  Faltan columnas de equipos (ver backend/sql/001 y 002)');
+      aviso = 'El equipo se creó solo con su nombre: falta ejecutar backend/sql/002_equipos_ampliado.sql en Supabase';
+      try {
+        equipo = await equipoModel.crear({ ...basico, creado_por: req.usuario.id });
+      } catch (e2) {
+        if (!/creado_por/.test(e2.message)) throw e2;
+        equipo = await equipoModel.crear(basico);
+      }
     }
-    res.status(201).json({ mensaje: 'Equipo creado', equipo });
+    res.status(201).json({ mensaje: 'Equipo creado', equipo, aviso });
   } catch (error) {
     fallo(res, error, 'Error al crear el equipo');
   }
@@ -58,7 +105,9 @@ export const obtenerEquipoPorId = async (req, res) => {
 
 export const actualizarEquipo = async (req, res) => {
   try {
-    const cambios = pick(req.body, ['nombre', 'logo_url']);
+    const ficha = camposEquipo(req.body);
+    if (ficha.error) return res.status(400).json({ mensaje: ficha.error });
+    const cambios = { ...pick(req.body, ['nombre', 'logo_url']), ...ficha.campos };
     if (!Object.keys(cambios).length) return res.status(400).json({ mensaje: 'No hay campos válidos para actualizar' });
     res.json({ mensaje: 'Equipo actualizado', equipo: await equipoModel.actualizar(req.params.id, cambios) });
   } catch (error) {
@@ -84,6 +133,7 @@ export const agregarJugadorEquipo = async (req, res) => {
     if (await equipoModel.buscarJugador(req.params.id, usuario_id)) {
       return res.status(409).json({ mensaje: 'El jugador ya está en el equipo' });
     }
+    if (await plantillaLlena(req.equipo ?? (await equipoModel.buscarPorId(req.params.id)))) return res.status(409).json({ mensaje: 'La plantilla ya alcanzó su cupo de jugadores' });
     const jugador = await equipoModel.agregarJugador({ equipo_id: req.params.id, usuario_id, posicion, dorsal });
     res.status(201).json({ mensaje: 'Jugador agregado al equipo', jugador });
   } catch (error) {
@@ -101,7 +151,7 @@ export const obtenerPlantilla = async (req, res) => {
 
 export const actualizarJugadorEquipo = async (req, res) => {
   try {
-    const cambios = pick(req.body, ['posicion', 'dorsal', 'estado_convocatoria', 'es_titular']);
+    const cambios = pick(req.body, ['posicion', 'dorsal', 'estado_convocatoria', 'es_titular', 'slot_campo']);
     if (!Object.keys(cambios).length) return res.status(400).json({ mensaje: 'No hay campos válidos para actualizar' });
     res.json({ mensaje: 'Jugador actualizado', jugador: await equipoModel.actualizarJugador(req.params.id, req.params.usuarioId, cambios) });
   } catch (error) {
@@ -209,5 +259,47 @@ export const buscarJugadores = async (req, res) => {
     res.json(jugadores.filter((j) => !enEquipo.has(String(j.id))).map((j) => ({ ...j, posicion: posicion[String(j.id)] ?? null })));
   } catch (error) {
     fallo(res, error, 'Error al buscar jugadores');
+  }
+};
+
+// Escudo del equipo (imagen subida a Cloudinary por el middleware)
+export const actualizarLogoEquipo = async (req, res) => {
+  try {
+    if (!req.file) return res.status(400).json({ mensaje: 'No se envió ninguna imagen' });
+    if (req.equipo.logo_url) await eliminarImagen(req.equipo.logo_url);
+    res.json({ mensaje: 'Escudo actualizado', equipo: await equipoModel.actualizar(req.params.id, { logo_url: req.file.path }) });
+  } catch (error) {
+    fallo(res, error, 'Error al actualizar el escudo');
+  }
+};
+
+// Guarda la alineación del campo: formación + qué jugador ocupa cada casilla.
+// Todos los demás jugadores pasan a suplentes. Cuerpo: { formacion, titulares: [{ usuario_id, slot, posicion }] }
+export const guardarAlineacion = async (req, res) => {
+  try {
+    const { formacion, titulares } = req.body;
+    if (!Array.isArray(titulares)) return res.status(400).json({ mensaje: 'titulares debe ser una lista' });
+    if (formacion !== undefined && !/^[1-9](-[1-9]){1,4}$/.test(String(formacion))) return res.status(400).json({ mensaje: 'Formación no válida' });
+
+    const slots = titulares.map((t) => Number(t.slot));
+    if (slots.some((s) => !Number.isInteger(s) || s < 0 || s > 20) || new Set(slots).size !== slots.length) return res.status(400).json({ mensaje: 'Casillas repetidas o no válidas' });
+    const usuarios = titulares.map((t) => String(t.usuario_id));
+    if (new Set(usuarios).size !== usuarios.length) return res.status(400).json({ mensaje: 'Un jugador no puede ocupar dos casillas' });
+
+    const plantilla = await equipoModel.listarJugadores(req.params.id);
+    const enEquipo = new Set(plantilla.map((j) => String(j.usuarios?.id)));
+    if (usuarios.some((u) => !enEquipo.has(u))) return res.status(400).json({ mensaje: 'Hay jugadores que no pertenecen al equipo' });
+
+    // 1) Todos a suplentes  2) cada titular a su casilla
+    datos(await supabase.from('equipo_jugadores').update({ es_titular: false, slot_campo: null }).eq('equipo_id', req.params.id));
+    for (const t of titulares) {
+      const cambios = { es_titular: true, slot_campo: Number(t.slot) };
+      if (t.posicion) cambios.posicion = texto(t.posicion, 40);
+      await equipoModel.actualizarJugador(req.params.id, t.usuario_id, cambios);
+    }
+    if (formacion) await equipoModel.actualizar(req.params.id, { formacion: String(formacion) });
+    res.json({ mensaje: 'Alineación guardada', titulares: titulares.length });
+  } catch (error) {
+    fallo(res, error, 'Error al guardar la alineación');
   }
 };

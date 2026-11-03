@@ -31,7 +31,7 @@ export const equipoModel = {
   },
   async listarJugadores(equipo_id) {
     return datos(await jugadores()
-      .select('id, posicion, dorsal, estado_convocatoria, es_titular, creado_en, usuarios ( id, nombre, apellido )')
+      .select('*, usuarios ( id, nombre, apellido )')
       .eq('equipo_id', equipo_id));
   },
   async actualizarJugador(equipo_id, usuario_id, cambios) {

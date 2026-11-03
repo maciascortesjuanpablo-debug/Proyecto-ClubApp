@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../core/app_colors.dart';
+import '../components/scout_burbuja.dart';
 import '../services/scout_service.dart';
 import 'scout_conversations_page.dart';
 
@@ -34,7 +35,14 @@ class _ScoutPageState extends State<ScoutPage> {
   bool _cargandoHistorial = false;
 
   @override
+  void initState() {
+    super.initState();
+    ScoutBurbuja.ocultar(); // mientras el chat está abierto no hace falta la burbuja
+  }
+
+  @override
   void dispose() {
+    ScoutBurbuja.mostrar();
     _input.dispose();
     _scroll.dispose();
     super.dispose();

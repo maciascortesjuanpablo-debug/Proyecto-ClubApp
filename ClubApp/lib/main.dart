@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'components/scout_burbuja.dart';
 import 'core/app_theme.dart';
 import 'screens/splash_page.dart';
 
@@ -12,6 +13,9 @@ class MyApp extends StatelessWidget {
         title: 'ClubApp',
         theme: AppTheme.darkTheme,
         debugShowCheckedModeBanner: false,
+        navigatorKey: navigatorKey,
+        navigatorObservers: [ScoutObserver()],
+        builder: (context, child) => Stack(children: [if (child != null) child, const ScoutBurbuja()]),
         home: const SplashScreen(),
       );
 }

@@ -1,3 +1,4 @@
+import 'package:flutter/painting.dart';
 import 'json_utils.dart';
 import 'torneo.dart';
 
@@ -15,6 +16,14 @@ class Equipo {
   final bool esTitular;
   // Solo para el entrenador: en qué torneos está inscrito
   final List<Inscripcion> inscripciones;
+  // Ficha del equipo
+  final String? eslogan;
+  final String? descripcion;
+  final String? ciudad;
+  final String? formato; // Fútbol 11, Fútbol 7, Fútbol 5, Fútbol sala
+  final String? formacion; // 4-4-2
+  final int? maxJugadores;
+  final String? colorPrincipal; // #RRGGBB
 
   const Equipo({
     required this.id,
@@ -26,6 +35,13 @@ class Equipo {
     this.dorsal,
     this.esTitular = false,
     this.inscripciones = const [],
+    this.eslogan,
+    this.descripcion,
+    this.ciudad,
+    this.formato,
+    this.formacion,
+    this.maxJugadores,
+    this.colorPrincipal,
   });
 
   factory Equipo.fromJson(Map<String, dynamic> j) => Equipo(
@@ -38,10 +54,28 @@ class Equipo {
         dorsal: j['dorsal'] == null ? null : toInt(j['dorsal']),
         esTitular: toBool(j['es_titular']),
         inscripciones: toLista(j['inscripciones']).map(Inscripcion.fromJson).toList(),
+        eslogan: toStrN(j['eslogan']),
+        descripcion: toStrN(j['descripcion']),
+        ciudad: toStrN(j['ciudad']),
+        formato: toStrN(j['formato']),
+        formacion: toStrN(j['formacion']),
+        maxJugadores: j['max_jugadores'] == null ? null : toInt(j['max_jugadores']),
+        colorPrincipal: toStrN(j['color_principal']),
       );
 
   String get iniciales => inicialesDe(nombre);
+
+  /// Color del equipo (o el azul de la app si no eligió uno)
+  Color get color => colorDesdeHex(colorPrincipal) ?? const Color(0xFF1E88E5);
 }
+
+/// "#1E88E5" -> Color; null si no es válido
+Color? colorDesdeHex(String? hex) {
+  if (hex == null || !RegExp(r'^#[0-9a-fA-F]{6}$').hasMatch(hex)) return null;
+  return Color(0xFF000000 | int.parse(hex.substring(1), radix: 16));
+}
+
+String colorAHex(Color c) => '#${(c.toARGB32() & 0xFFFFFF).toRadixString(16).padLeft(6, '0').toUpperCase()}';
 
 /// Un jugador dentro de la plantilla de un equipo (tabla `equipo_jugadores`)
 class JugadorPlantilla {
@@ -53,8 +87,9 @@ class JugadorPlantilla {
   final int? dorsal;
   final String estado;
   final bool esTitular;
+  final int? slotCampo; // casilla que ocupa en el campo (null = suplente)
 
-  const JugadorPlantilla({required this.id, this.usuarioId, required this.nombre, required this.apellido, required this.posicion, this.dorsal, this.estado = '', this.esTitular = false});
+  const JugadorPlantilla({required this.id, this.usuarioId, required this.nombre, required this.apellido, required this.posicion, this.dorsal, this.estado = '', this.esTitular = false, this.slotCampo});
 
   factory JugadorPlantilla.fromJson(Map<String, dynamic> j) {
     final u = toMap(j['usuarios']);
@@ -67,6 +102,7 @@ class JugadorPlantilla {
       dorsal: j['dorsal'] == null ? null : toInt(j['dorsal']),
       estado: toStr(j['estado_convocatoria']),
       esTitular: toBool(j['es_titular']),
+      slotCampo: j['slot_campo'] == null ? null : toInt(j['slot_campo']),
     );
   }
 

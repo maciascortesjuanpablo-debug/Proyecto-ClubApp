@@ -3,6 +3,7 @@ import { equipoModel } from '../models/equipos.js';
 import { torneoModel } from '../models/torneos.js';
 import { notificar } from '../models/notificaciones.js';
 import { fallo } from '../utils/helpers.js';
+import { plantillaLlena } from './equipos.js';
 import { esDuenoEquipo, esOrganizadorTorneo } from '../utils/permisos.js';
 
 const TORNEO_CERRADO = ['Finalizado', 'Cancelado'];
@@ -96,6 +97,7 @@ export const crearInvitacion = async (req, res) => {
     if (!equipo) return res.status(404).json({ mensaje: 'Equipo no encontrado' });
     if (!esDuenoEquipo(req, equipo)) return res.status(403).json({ mensaje: 'Solo el dueño del equipo puede invitar' });
     if (await equipoModel.buscarJugador(equipo_id, usuario_id)) return res.status(409).json({ mensaje: 'Ese jugador ya está en el equipo' });
+    if (await plantillaLlena(equipo)) return res.status(409).json({ mensaje: 'La plantilla ya alcanzó su cupo de jugadores' });
     if (await inscripcionModel.buscarInvitacionPendiente(equipo_id, usuario_id)) {
       return res.status(409).json({ mensaje: 'Ya hay una invitación pendiente para ese jugador' });
     }
@@ -128,6 +130,9 @@ export const responderInvitacion = async (req, res) => {
     }
     if (invitacion.estado !== 'Pendiente') return res.status(409).json({ mensaje: 'Esta invitación ya fue respondida' });
 
+    if (respuesta === 'Aceptada' && await plantillaLlena(await equipoModel.buscarPorId(invitacion.equipo_id))) {
+      return res.status(409).json({ mensaje: 'El equipo ya completó su plantilla' });
+    }
     // Primero se agrega al jugador y solo después se marca la invitación, para no quedar a medias
     if (respuesta === 'Aceptada' && !(await equipoModel.buscarJugador(invitacion.equipo_id, invitacion.usuario_id))) {
       await equipoModel.agregarJugador({

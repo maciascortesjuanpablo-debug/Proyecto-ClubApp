@@ -1,4 +1,8 @@
+import 'package:http/http.dart' as http;
+import 'package:http_parser/http_parser.dart';
+import '../config/api_config.dart';
 import '../models/models.dart';
+import 'auth_service.dart';
 import 'api_client.dart';
 import 'resultado.dart';
 
@@ -30,8 +34,33 @@ class TeamService {
   }
 
   // ---- Solo entrenador ----
-  static Future<Map<String, dynamic>> crear(String nombre) => ApiClient.pedir('POST', '/equipos', cuerpo: {'nombre': nombre});
-  static Future<Map<String, dynamic>> renombrar(Object id, String nombre) => ApiClient.pedir('PUT', '/equipos/$id', cuerpo: {'nombre': nombre});
+  /// Crea el equipo con su ficha: nombre, eslogan, ciudad, formato, formación, cupo, color y descripción
+  static Future<Map<String, dynamic>> crear(Map<String, dynamic> ficha) => ApiClient.pedir('POST', '/equipos', cuerpo: ficha);
+  static Future<Map<String, dynamic>> actualizar(Object id, Map<String, dynamic> cambios) => ApiClient.pedir('PUT', '/equipos/$id', cuerpo: cambios);
+
+  /// Sube el escudo del equipo (imagen JPG, PNG o WEBP)
+  static Future<Map<String, dynamic>> subirEscudo(Object id, String ruta) async {
+    try {
+      final extension = ruta.split('.').last.toLowerCase();
+      final peticion = http.MultipartRequest('PUT', Uri.parse('${ApiConfig.baseUrl}/equipos/$id/logo'))
+        ..headers['Authorization'] = 'Bearer ${AuthService.token}'
+        ..files.add(await http.MultipartFile.fromPath('logo', ruta, contentType: MediaType('image', extension == 'jpg' ? 'jpeg' : extension)));
+      final r = await http.Response.fromStream(await peticion.send().timeout(const Duration(seconds: 40)));
+      return {'exito': r.statusCode >= 200 && r.statusCode < 300, 'mensaje': r.statusCode >= 200 && r.statusCode < 300 ? 'Escudo actualizado' : 'No se pudo subir el escudo'};
+    } catch (_) {
+      return {'exito': false, 'mensaje': 'No se pudo subir el escudo'};
+    }
+  }
+
+  /// Guarda la alineación del campo: formación y qué jugador ocupa cada casilla
+  static Future<Map<String, dynamic>> guardarAlineacion(Object equipoId, String formacion, List<Map<String, dynamic>> titulares) =>
+      ApiClient.pedir('PUT', '/equipos/$equipoId/alineacion', cuerpo: {'formacion': formacion, 'titulares': titulares});
+
+  /// Ficha completa de un equipo
+  static Future<Resultado<Equipo>> detalle(Object id) async {
+    final r = await ApiClient.pedir('GET', '/equipos/$id');
+    return r['exito'] == true ? Resultado.ok(Equipo.fromJson(r)) : Resultado.fallo(r['mensaje'].toString());
+  }
   static Future<Map<String, dynamic>> eliminar(Object id) => ApiClient.pedir('DELETE', '/equipos/$id');
 
   static Future<Map<String, dynamic>> actualizarJugador(Object equipoId, Object usuarioId, Map<String, dynamic> cambios) => ApiClient.pedir('PUT', '/equipos/$equipoId/jugadores/$usuarioId', cuerpo: cambios);
