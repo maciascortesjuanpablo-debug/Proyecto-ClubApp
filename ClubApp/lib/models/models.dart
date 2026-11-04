@@ -1,6 +1,7 @@
 export 'admin_resumen.dart';
 export 'equipo.dart';
 export 'estadistica.dart';
+export 'fixture.dart';
 export 'json_utils.dart';
 export 'notificacion.dart';
 export 'paneles.dart';

@@ -80,3 +80,25 @@ export const avisarArbitro = seguro(async (evento, usuario_id, rol, actorId) => 
   const { local, visitante } = await enfrentamiento(evento);
   await notificarVarios([usuario_id], `Te asignaron como árbitro ${String(rol).toLowerCase()}: ${local} vs ${visitante} · ${cuando(evento.fecha, evento.hora)}`, { tipo: 'designacion', referencia_id: evento.id });
 });
+
+// Se publicó el calendario completo de un torneo: un aviso por persona de cada equipo, con su cantidad de partidos y el primero
+export const avisarFixtureCreado = seguro(async (torneo, partidos, nombres, actorId) => {
+  const porEquipo = new Map();
+  for (const p of partidos) {
+    for (const [equipo, rival] of [[p.local, p.visitante], [p.visitante, p.local]]) {
+      const lista = porEquipo.get(equipo) ?? [];
+      lista.push({ rival, fecha: p.fecha, hora: p.hora });
+      porEquipo.set(equipo, lista);
+    }
+  }
+  for (const [equipo, lista] of porEquipo) {
+    lista.sort((a, b) => `${a.fecha} ${a.hora}`.localeCompare(`${b.fecha} ${b.hora}`));
+    const primero = lista[0];
+    const personas = await destinatariosDeEquipos([equipo]);
+    await notificarVarios(
+      sinActor(personas, actorId),
+      `Calendario de "${torneo.nombre}": ${nombres[equipo] ?? 'tu equipo'} juega ${lista.length} partido${lista.length === 1 ? '' : 's'}. Primero: vs ${nombres[primero.rival] ?? 'rival'} · ${cuando(primero.fecha, primero.hora)}`,
+      { tipo: 'torneo', referencia_id: torneo.id },
+    );
+  }
+});

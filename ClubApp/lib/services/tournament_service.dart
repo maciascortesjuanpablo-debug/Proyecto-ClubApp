@@ -95,4 +95,15 @@ class TournamentService {
   }
 
   static Future<Map<String, dynamic>> cambiarEstado(Object id, String estado) => ApiClient.pedir('PUT', '/torneos/$id', cuerpo: {'estado': estado});
+
+  // ---- Fixture automático (solo organizador dueño del torneo o admin) ----
+
+  /// Calcula el calendario que se crearía, sin guardar nada
+  static Future<Resultado<PropuestaFixture>> previsualizarFixture(Object id, Map<String, dynamic> config) async {
+    final r = await ApiClient.pedir('POST', '/torneos/$id/fixture/previsualizar', cuerpo: config);
+    return r['exito'] == true ? Resultado.ok(PropuestaFixture.fromJson(r)) : Resultado.fallo(r['mensaje'].toString());
+  }
+
+  /// Crea los partidos en el calendario con la misma configuración de la vista previa
+  static Future<Map<String, dynamic>> crearFixture(Object id, Map<String, dynamic> config) => ApiClient.pedir('POST', '/torneos/$id/fixture', cuerpo: config);
 }

@@ -29,6 +29,8 @@ class Partido {
   final String? sede;
   final List<String> relacion; // equipo, arbitro, organizador
   final String? rolArbitraje; // solo en la vista del árbitro
+  final int? jornada; // número de jornada (fixture automático)
+  final String? fase; // Grupo A, Ida, Vuelta, Cuartos de final...
   /// JSON original: las hojas de resultado y de árbitros trabajan con él
   final Map<String, dynamic> raw;
 
@@ -49,6 +51,8 @@ class Partido {
     this.sede,
     this.relacion = const [],
     this.rolArbitraje,
+    this.jornada,
+    this.fase,
     this.raw = const {},
   });
 
@@ -72,6 +76,8 @@ class Partido {
       sede: toStrN(toMap(j['sedes_canchas'])['nombre']),
       relacion: (j['relacion'] is List) ? (j['relacion'] as List).map((e) => '$e').toList() : const [],
       rolArbitraje: toStrN(j['rol_arbitraje']),
+      jornada: j['jornada'] == null ? null : toInt(j['jornada']),
+      fase: toStrN(j['fase']),
       raw: j,
     );
   }

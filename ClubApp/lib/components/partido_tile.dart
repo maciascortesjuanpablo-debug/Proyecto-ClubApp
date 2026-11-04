@@ -54,6 +54,7 @@ class PartidoTile extends StatelessWidget {
       Wrap(spacing: 6, runSpacing: 6, crossAxisAlignment: WrapCrossAlignment.center, children: [
         TournamentChip(p.estado, color: colorEstadoPartido(p.estado)),
         if (resultado != null) TournamentChip(switch (resultado) { 'G' => 'Victoria', 'P' => 'Derrota', _ => 'Empate' }, color: colorRes),
+        if (p.jornada != null || p.fase != null) TournamentChip([if (p.jornada != null) 'Jornada ${p.jornada}', if (p.fase != null) p.fase!].join(' · '), color: AppColors.textGray),
         if (etiqueta != null) TournamentChip(etiqueta!, color: AppColors.secondary, icono: Icons.star),
         if (p.sede != null) Row(mainAxisSize: MainAxisSize.min, children: [const Icon(Icons.location_on_outlined, size: 13, color: AppColors.textGray), const SizedBox(width: 3), Text(p.sede!, style: const TextStyle(fontSize: 11.5, color: AppColors.textGray))]),
       ]),

@@ -7,13 +7,14 @@ import '../../services/team_service.dart';
 import '../../services/tournament_service.dart';
 import 'torneo_calendario_tab.dart';
 import 'torneo_equipos_tab.dart';
+import 'torneo_fixture_tab.dart';
 import 'torneo_partidos_tab.dart';
 import 'torneo_posiciones_tab.dart';
 import 'torneo_resumen_tab.dart';
 
 /// Detalle de un torneo, común a todos los roles. Las pestañas cambian según quién lo mira:
 /// todos ven Resumen, Posiciones, Partidos y Equipos; el organizador dueño (o el admin) además
-/// tiene el Calendario para programar partidos y gestiona las inscripciones.
+/// tiene el Fixture automático y el Calendario para programar partidos, y gestiona las inscripciones.
 class TorneoPage extends StatefulWidget {
   final Object torneoId;
   final String? nombre;
@@ -84,6 +85,7 @@ class _TorneoPageState extends State<TorneoPage> {
       ('Posiciones', TorneoPosicionesTab(key: ValueKey('pos$_version'), torneoId: widget.torneoId, mios: _mios)),
       ('Partidos', TorneoPartidosTab(key: ValueKey('par$_version'), torneoId: widget.torneoId, mios: _mios)),
       ('Equipos', TorneoEquiposTab(key: ValueKey('eq$_version'), torneo: r.torneo, esGestor: gestor, mios: _mios, onCambio: _cargar)),
+      if (gestor) ('Fixture', TorneoFixtureTab(key: ValueKey('fix$_version'), torneo: r.torneo, onCambio: _cargar)),
       if (gestor) ('Calendario', TorneoCalendarioTab(key: ValueKey('cal$_version'), torneo: r.torneo, onCambio: _cargar)),
     ];
     return DefaultTabController(

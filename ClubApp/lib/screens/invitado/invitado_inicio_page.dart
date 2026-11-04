@@ -48,7 +48,7 @@ class _InvitadoInicioPageState extends State<InvitadoInicioPage> {
             onRefresh: _cargar,
             child: ListView(physics: const AlwaysScrollableScrollPhysics(), padding: const EdgeInsets.fromLTRB(20, 12, 20, 130), children: [
               _hero(),
-              const SeccionTitulo('Torneos en juego', accion: 'Ver todos', onAccion: null),
+              const SeccionTitulo('Torneos en juego'),
               _torneosDestacados(),
               const SeccionTitulo('Una app para cada rol'),
               _roles(),
