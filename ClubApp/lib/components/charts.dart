@@ -161,29 +161,33 @@ class BarrasVerticales extends StatelessWidget {
     if (datos.isEmpty) return const Padding(padding: EdgeInsets.all(16), child: Text('Sin datos', style: TextStyle(color: AppColors.textGray, fontSize: 12)));
     final maximo = datos.fold<num>(0, (a, b) => a > b.valor ? a : b.valor);
     return SizedBox(
-      height: alto + 38,
+      height: alto + 50,
       child: Row(crossAxisAlignment: CrossAxisAlignment.end, children: [
         for (final d in datos)
           Expanded(
-            child: Column(mainAxisAlignment: MainAxisAlignment.end, children: [
-              Text('${d.valor}', style: const TextStyle(fontSize: 11, color: AppColors.textWhite, fontWeight: FontWeight.bold)),
-              const SizedBox(height: 4),
-              TweenAnimationBuilder<double>(
-                tween: Tween(begin: 0, end: maximo == 0 ? 0 : (d.valor / maximo).toDouble()),
-                duration: const Duration(milliseconds: 600),
-                curve: Curves.easeOutCubic,
-                builder: (_, v, __) => Container(
-                  width: 22,
-                  height: math.max(4, alto * v),
-                  decoration: BoxDecoration(
-                    color: d.color ?? color,
-                    borderRadius: const BorderRadius.vertical(top: Radius.circular(6)),
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.end,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text('${d.valor}', style: const TextStyle(fontSize: 11, color: AppColors.textWhite, fontWeight: FontWeight.bold)),
+                const SizedBox(height: 4),
+                TweenAnimationBuilder<double>(
+                  tween: Tween(begin: 0, end: maximo == 0 ? 0 : (d.valor / maximo).toDouble()),
+                  duration: const Duration(milliseconds: 600),
+                  curve: Curves.easeOutCubic,
+                  builder: (_, v, __) => Container(
+                    width: 22,
+                    height: math.max(4, alto * v),
+                    decoration: BoxDecoration(
+                      color: d.color ?? color,
+                      borderRadius: const BorderRadius.vertical(top: Radius.circular(6)),
+                    ),
                   ),
                 ),
-              ),
-              const SizedBox(height: 6),
-              Text(d.etiqueta, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 10, color: AppColors.textGray)),
-            ]),
+                const SizedBox(height: 6),
+                Text(d.etiqueta, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 10, color: AppColors.textGray)),
+              ],
+            ),
           ),
       ]),
     );
