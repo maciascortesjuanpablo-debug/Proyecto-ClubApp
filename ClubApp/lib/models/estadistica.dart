@@ -35,3 +35,32 @@ class EstadisticasJugador {
   double get golesPorPartido => partidos == 0 ? 0 : goles / partidos;
   int get tarjetas => amarillas + rojas;
 }
+
+/// Estadísticas de un jugador en UN partido, tal como las devuelve `GET /estadisticas/evento/:id`
+class EstadisticaJugadorPartido {
+  final Object? usuarioId;
+  final Object? equipoId;
+  final String nombre;
+  final String equipo;
+  final int goles, asistencias, amarillas, rojas, minutos;
+
+  const EstadisticaJugadorPartido({this.usuarioId, this.equipoId, required this.nombre, this.equipo = '', this.goles = 0, this.asistencias = 0, this.amarillas = 0, this.rojas = 0, this.minutos = 0});
+
+  factory EstadisticaJugadorPartido.fromJson(Map<String, dynamic> j) {
+    final u = toMap(j['usuarios']);
+    final e = toMap(j['equipos']);
+    return EstadisticaJugadorPartido(
+      usuarioId: u['id'] as Object?,
+      equipoId: e['id'] as Object?,
+      nombre: '${toStr(u['nombre'])} ${toStr(u['apellido'])}'.trim(),
+      equipo: toStr(e['nombre']),
+      goles: toInt(j['goles']),
+      asistencias: toInt(j['asistencias']),
+      amarillas: toInt(j['tarjetas_amarillas']),
+      rojas: toInt(j['tarjetas_rojas']),
+      minutos: toInt(j['minutos_jugados']),
+    );
+  }
+
+  bool get tieneAlgo => goles > 0 || asistencias > 0 || amarillas > 0 || rojas > 0;
+}

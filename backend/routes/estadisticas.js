@@ -1,7 +1,7 @@
 import { Router } from 'express';
 import {
   crearEstadistica, obtenerEstadisticasPorEvento, obtenerEstadisticasPorJugador,
-  actualizarEstadistica, eliminarEstadistica,
+  actualizarEstadistica, eliminarEstadistica, guardarEstadisticasEvento,
 } from '../controllers/estadisticas.js';
 import { verificarToken, verificarRol } from '../middlewares/middlewares.js';
 import { ROLES } from '../utils/helpers.js';
@@ -12,6 +12,7 @@ const registran = verificarRol(ENTRENADOR, ORGANIZADOR, ARBITRO, ADMIN); // el c
 
 router.post('/', verificarToken, registran, crearEstadistica);
 router.get('/evento/:eventoId', obtenerEstadisticasPorEvento);
+router.put('/evento/:eventoId', verificarToken, registran, guardarEstadisticasEvento); // varios jugadores de un partido a la vez
 router.get('/jugador/:usuarioId', obtenerEstadisticasPorJugador);
 router.put('/:id', verificarToken, registran, actualizarEstadistica);
 router.delete('/:id', verificarToken, verificarRol(ADMIN), eliminarEstadistica); // solo Admin borra

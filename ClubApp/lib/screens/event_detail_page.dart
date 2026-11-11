@@ -2,10 +2,14 @@ import 'package:flutter/material.dart';
 import '../core/app_colors.dart';
 import '../core/calendar_utils.dart';
 import '../components/admin_widgets.dart';
+import '../components/estadisticas_partido_card.dart';
 import '../components/referee_sheet.dart';
 import '../components/result_sheet.dart';
 import '../components/tournament_chip.dart';
+import '../core/roles.dart';
 import '../services/calendar_service.dart';
+import '../services/team_service.dart';
+import 'estadisticas_partido_page.dart';
 import 'event_form_page.dart';
 
 /// Detalle de un evento. Las acciones dependen del rol: el organizador del torneo (o admin) lo edita y gestiona
@@ -23,6 +27,8 @@ class _EventDetailPageState extends State<EventDetailPage> {
   Map<String, dynamic>? _e;
   String? _error;
   bool _cargando = true;
+  Set<String> _misEquipos = {}; // para el entrenador: sus equipos (solo puede registrar estadísticas del suyo)
+  int _version = 0; // al cambiar, la tarjeta de estadísticas vuelve a pedir sus datos
 
   @override
   void initState() {
@@ -33,12 +39,31 @@ class _EventDetailPageState extends State<EventDetailPage> {
 
   Future<void> _cargar() async {
     final r = await CalendarService.evento(widget.eventoId);
+    Set<String> mios = _misEquipos;
+    if (RolApp.actual == RolApp.entrenador) {
+      final eq = await TeamService.mios();
+      if (eq.ok) mios = eq.dato!.map((x) => '${x.id}').toSet();
+    }
     if (!mounted) return;
     setState(() {
       _cargando = false;
+      _misEquipos = mios;
+      _version++;
       _error = r['exito'] == true ? null : r['mensaje'].toString();
       if (r['exito'] == true) _e = r;
     });
+  }
+
+  /// Equipos de este partido cuyas estadísticas puede registrar quien mira: organizador, admin y árbitro asignado, ambos; el entrenador, el suyo
+  Set<String> _equiposEditables(Map<String, dynamic> e) {
+    final ids = [e['equipo_local_id'], e['equipo_visitante_id']].where((x) => x != null).map((x) => '$x').toSet();
+    if (puedeGestionarEvento(e) || soyArbitroDe(e)) return ids;
+    return ids.where(_misEquipos.contains).toSet();
+  }
+
+  Future<void> _estadisticas(Set<String> editables) async {
+    final guardado = await Navigator.push<bool>(context, MaterialPageRoute(builder: (_) => EstadisticasPartidoPage(eventoId: widget.eventoId, evento: _e!, equiposEditables: editables)));
+    if (guardado == true && mounted) _cargar();
   }
 
   void _aviso(String texto) => ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(texto)));
@@ -86,6 +111,8 @@ class _EventDetailPageState extends State<EventDetailPage> {
     final puedeResultado = partido && (gestiona || soyArbitroDe(e));
     final arbitros = ((e['arbitros'] as List?) ?? []).cast<Map<String, dynamic>>();
     final sede = e['sedes_canchas'] as Map<String, dynamic>?;
+    final jugado = partido && (estado == 'En vivo' || estado == 'Finalizado');
+    final editables = jugado ? _equiposEditables(e) : <String>{};
 
     return [
       Container(
@@ -107,6 +134,8 @@ class _EventDetailPageState extends State<EventDetailPage> {
       _fila(Icons.sports_outlined, 'Árbitros', arbitros.isEmpty ? 'Sin asignar' : arbitros.map((a) => '${a['usuarios']?['nombre'] ?? ''} ${a['usuarios']?['apellido'] ?? ''}'.trim()).join(', ')),
       const SizedBox(height: 12),
       if (puedeResultado) _accion(Icons.scoreboard_outlined, 'Registrar resultado', _resultado),
+      if (editables.isNotEmpty) _accion(Icons.bar_chart_rounded, 'Registrar estadísticas de jugadores', () => _estadisticas(editables)),
+      if (jugado) ...[const SizedBox(height: 4), EstadisticasPartidoCard(key: ValueKey('est$_version'), eventoId: widget.eventoId), const SizedBox(height: 14)],
       if (gestiona) ...[
         _accion(Icons.edit_outlined, 'Editar evento', _editar),
         _accion(Icons.sports, 'Gestionar árbitros', _arbitros),

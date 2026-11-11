@@ -1,8 +1,9 @@
+import { supabase } from '../config/supabase.js';
 import { estadisticaModel } from '../models/estadisticas.js';
 import { calendarioModel } from '../models/calendario.js';
 import { equipoModel } from '../models/equipos.js';
 import { torneoModel } from '../models/torneos.js';
-import { ROLES, entero, esAdmin, fallo } from '../utils/helpers.js';
+import { ROLES, datos, entero, esAdmin, fallo } from '../utils/helpers.js';
 import { esDuenoEquipo, esOrganizadorTorneo } from '../utils/permisos.js';
 
 const NUMERICOS = ['goles', 'asistencias', 'tarjetas_amarillas', 'tarjetas_rojas', 'minutos_jugados'];
@@ -94,5 +95,84 @@ export const eliminarEstadistica = async (req, res) => {
     res.json({ mensaje: 'Estadística eliminada' });
   } catch (error) {
     fallo(res, error, 'Error al eliminar la estadística');
+  }
+};
+
+// Topes razonables para UN partido
+const LIMITES_PARTIDO = { goles: 30, asistencias: 30, tarjetas_amarillas: 2, tarjetas_rojas: 1, minutos_jugados: 130 };
+const CAMPO_BD = { goles: 'goles', asistencias: 'asistencias', tarjetas_amarillas: 'tarjetas_amarillas', tarjetas_rojas: 'tarjetas_rojas', minutos_jugados: 'minutos_jugados' };
+
+// Guarda las estadísticas de varios jugadores de un partido a la vez (la pantalla "Registrar estadísticas").
+// Cuerpo: { jugadores: [{ usuario_id, equipo_id, goles, asistencias, tarjetas_amarillas, tarjetas_rojas, minutos_jugados }] }
+// Si un jugador ya tenía estadísticas en ese partido se actualizan (nunca se duplican); si no, se crean solo cuando hay algo que registrar.
+export const guardarEstadisticasEvento = async (req, res) => {
+  try {
+    const evento = await calendarioModel.buscarPorId(req.params.eventoId);
+    if (!evento) return res.status(404).json({ mensaje: 'Evento no encontrado' });
+    if (evento.tipo !== 'Partido') return res.status(400).json({ mensaje: 'Solo los partidos tienen estadísticas de jugadores' });
+    if (!['En vivo', 'Finalizado'].includes(evento.estado)) return res.status(409).json({ mensaje: 'Las estadísticas se registran cuando el partido está en vivo o finalizado' });
+
+    const filas = req.body?.jugadores;
+    if (!Array.isArray(filas) || !filas.length || filas.length > 80) return res.status(400).json({ mensaje: 'Envía entre 1 y 80 jugadores' });
+
+    const equiposPartido = [evento.equipo_local_id, evento.equipo_visitante_id].map(String);
+    const vistos = new Set();
+    const limpias = [];
+    for (const f of filas) {
+      if (!f?.usuario_id || !f?.equipo_id) return res.status(400).json({ mensaje: 'Cada jugador necesita usuario_id y equipo_id' });
+      if (!equiposPartido.includes(String(f.equipo_id))) return res.status(400).json({ mensaje: 'Hay jugadores de un equipo que no juega este partido' });
+      if (vistos.has(String(f.usuario_id))) return res.status(400).json({ mensaje: 'Un jugador aparece repetido' });
+      vistos.add(String(f.usuario_id));
+      const numeros = {};
+      for (const [campo, tope] of Object.entries(LIMITES_PARTIDO)) {
+        const v = entero(f[campo] ?? 0, 0, tope);
+        if (v === null) return res.status(400).json({ mensaje: `${campo.replace('_', ' ')} debe ser un número entre 0 y ${tope}` });
+        numeros[CAMPO_BD[campo]] = v;
+      }
+      limpias.push({ usuario_id: f.usuario_id, equipo_id: f.equipo_id, ...numeros });
+    }
+
+    // Permiso por equipo: organizador, admin y árbitro asignado, o el entrenador dueño (solo su equipo)
+    for (const equipo of new Set(limpias.map((f) => String(f.equipo_id)))) {
+      if (!(await puedeRegistrar(req, evento.id, equipo))) return res.status(403).json({ mensaje: 'No puedes registrar estadísticas de este equipo en este partido' });
+      const plantilla = (await equipoModel.listarJugadores(equipo)).map((j) => String(j.usuarios?.id));
+      if (limpias.some((f) => String(f.equipo_id) === equipo && !plantilla.includes(String(f.usuario_id)))) {
+        return res.status(400).json({ mensaje: 'Hay jugadores que no pertenecen a la plantilla del equipo' });
+      }
+    }
+
+    const existentes = datos(await supabase.from('estadisticas_jugador').select('id, usuario_id').eq('evento_id', evento.id));
+    let creadas = 0;
+    let actualizadas = 0;
+    for (const f of limpias) {
+      const { usuario_id, equipo_id, ...numeros } = f;
+      const previas = existentes.filter((e) => String(e.usuario_id) === String(usuario_id));
+      if (previas.length) {
+        await estadisticaModel.actualizar(previas[0].id, numeros);
+        for (const duplicada of previas.slice(1)) await estadisticaModel.eliminar(duplicada.id); // limpia duplicados que hubiera de antes
+        actualizadas++;
+      } else if (Object.values(numeros).some((v) => v > 0)) {
+        await estadisticaModel.crear({ evento_id: evento.id, usuario_id, equipo_id, ...numeros });
+        creadas++;
+      }
+    }
+
+    // Advertencias (no bloquean): los goles registrados deberían sumar el marcador
+    const advertencias = [];
+    if (evento.resultado_local != null && evento.resultado_visitante != null) {
+      const [todas, equipos] = await Promise.all([
+        estadisticaModel.listarPorEvento(evento.id),
+        supabase.from('equipos').select('id, nombre').in('id', equiposPartido).then(datos),
+      ]);
+      const nombre = (id) => equipos.find((e) => String(e.id) === String(id))?.nombre ?? 'un equipo';
+      const golesDe = (equipo) => todas.filter((s) => String(s.equipos?.id) === String(equipo)).reduce((a, s) => a + (s.goles ?? 0), 0);
+      for (const [equipo, marcador] of [[evento.equipo_local_id, evento.resultado_local], [evento.equipo_visitante_id, evento.resultado_visitante]]) {
+        const registrados = golesDe(equipo);
+        if (registrados !== marcador) advertencias.push(`${nombre(equipo)}: goles registrados ${registrados}, marcador ${marcador}`);
+      }
+    }
+    res.json({ mensaje: 'Estadísticas guardadas', creadas, actualizadas, advertencias });
+  } catch (error) {
+    fallo(res, error, 'Error al guardar las estadísticas');
   }
 };
