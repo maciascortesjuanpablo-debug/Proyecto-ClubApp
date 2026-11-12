@@ -2,7 +2,7 @@ import { Router } from 'express';
 import { previsualizarFixture, crearFixture } from '../controllers/fixture.js';
 import {
   crearTorneo, obtenerTorneos, obtenerTorneoPorId, obtenerTorneosPorOrganizador,
-  actualizarTorneo, eliminarTorneo, crearGrupo, obtenerGruposPorTorneo, torneoPropio, resumenTorneo,
+  actualizarTorneo, eliminarTorneo, cambiarEstadoTorneo, crearGrupo, obtenerGruposPorTorneo, torneoPropio, resumenTorneo,
 } from '../controllers/torneos.js';
 import { verificarToken, verificarRol, propietarioOAdmin } from '../middlewares/middlewares.js';
 import { ROLES } from '../utils/helpers.js';
@@ -18,6 +18,7 @@ router.get('/organizador/:organizadorId', verificarToken, propietarioOAdmin('org
 router.get('/:id/resumen', resumenTorneo);
 router.get('/:id', obtenerTorneoPorId);
 router.put('/:id', ...gestion, actualizarTorneo);
+router.put('/:id/estado', ...gestion, cambiarEstadoTorneo); // finalizar, cancelar o reabrir (con sus reglas)
 router.delete('/:id', ...gestion, eliminarTorneo);
 
 // Fixture automático: previsualizar no guarda nada; el segundo crea los partidos en el calendario

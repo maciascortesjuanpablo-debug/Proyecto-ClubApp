@@ -8,6 +8,8 @@ class Torneo {
   final String estado;
   final String deporte;
   final String formato;
+  final Object? deporteId;
+  final Object? formatoId;
   final String? ciudad;
   final int maxEquipos;
   final int jornadaActual;
@@ -22,6 +24,8 @@ class Torneo {
     this.estado = 'Sin estado',
     this.deporte = '',
     this.formato = '',
+    this.deporteId,
+    this.formatoId,
     this.ciudad,
     this.maxEquipos = 0,
     this.jornadaActual = 0,
@@ -39,6 +43,8 @@ class Torneo {
       estado: toStr(j['estado'], 'Sin estado'),
       deporte: toStr(toMap(j['deportes'])['nombre']),
       formato: toStr(toMap(j['formatos'])['nombre']),
+      deporteId: toMap(j['deportes'])['id'] ?? j['deporte_id'],
+      formatoId: toMap(j['formatos'])['id'] ?? j['formato_id'],
       ciudad: toStrN(j['ciudad']),
       maxEquipos: toInt(j['max_equipos']),
       jornadaActual: toInt(j['jornada_actual']),

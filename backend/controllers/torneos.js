@@ -2,7 +2,8 @@ import { supabase } from '../config/supabase.js';
 import { torneoModel } from '../models/torneos.js';
 import { inscripcionModel } from '../models/inscripciones.js';
 import { panelModel } from '../models/panel.js';
-import { ahora, datos, entero, fallo, pick, texto } from '../utils/helpers.js';
+import { ahora, datos, entero, fallo, texto } from '../utils/helpers.js';
+import { avisarTorneoEliminado, avisarTorneoEstado } from '../utils/avisos.js';
 import { esOrganizadorTorneo } from '../utils/permisos.js';
 
 // Middleware: carga el torneo de :id y exige que el usuario sea su organizador (o Admin)
@@ -68,20 +69,123 @@ export const obtenerTorneosPorOrganizador = async (req, res) => {
   }
 };
 
+// Edición de los datos del torneo por su organizador (o el admin). Cada campo se valida;
+// el estado tiene su propio endpoint (PUT /:id/estado) porque cerrar un torneo tiene consecuencias.
 export const actualizarTorneo = async (req, res) => {
   try {
-    // Lista blanca: el organizador y los campos internos no se cambian por aquí
-    const cambios = pick(req.body, ['nombre', 'deporte_id', 'formato_id', 'max_equipos', 'ciudad', 'jornada_total', 'jornada_actual', 'estado']);
+    const torneo = req.torneo;
+    const body = req.body ?? {};
+    if (body.estado !== undefined) return res.status(400).json({ mensaje: 'Para finalizar, cancelar o reabrir el torneo usa la opción de estado' });
+
+    const cambios = {};
+    if (body.nombre !== undefined) {
+      const nombre = texto(body.nombre, 120);
+      if (!nombre) return res.status(400).json({ mensaje: 'El nombre no puede estar vacío' });
+      cambios.nombre = nombre;
+    }
+    if (body.ciudad !== undefined) cambios.ciudad = texto(body.ciudad) || null;
+
+    if (body.max_equipos !== undefined) {
+      const max = entero(body.max_equipos, 2, 256);
+      if (max === null) return res.status(400).json({ mensaje: 'El máximo de equipos debe estar entre 2 y 256' });
+      const aceptados = await inscripcionModel.contarAceptadas(torneo.id);
+      if (max < aceptados) return res.status(409).json({ mensaje: `Ya hay ${aceptados} equipos aceptados: el máximo no puede ser menor` });
+      cambios.max_equipos = max;
+    }
+
+    if (body.jornada_total !== undefined) {
+      if (body.jornada_total === null || body.jornada_total === '') cambios.jornada_total = null;
+      else {
+        const j = entero(body.jornada_total, 0, 500);
+        if (j === null) return res.status(400).json({ mensaje: 'Las jornadas deben ser un número entre 0 y 500' });
+        cambios.jornada_total = j;
+      }
+    }
+
+    // El deporte y el formato definen cómo se juega: no se cambian cuando ya hay partidos
+    if (body.deporte_id !== undefined || body.formato_id !== undefined) {
+      const partidos = datos(await supabase.from('eventos_calendario').select('id').eq('torneo_id', torneo.id).eq('tipo', 'Partido').limit(1));
+      if (partidos.length) return res.status(409).json({ mensaje: 'No se puede cambiar el deporte ni el formato cuando el torneo ya tiene partidos' });
+      if (body.deporte_id !== undefined) cambios.deporte_id = body.deporte_id;
+      if (body.formato_id !== undefined) cambios.formato_id = body.formato_id;
+    }
+
     if (!Object.keys(cambios).length) return res.status(400).json({ mensaje: 'No hay campos válidos para actualizar' });
-    res.json({ mensaje: 'Torneo actualizado', torneo: await torneoModel.actualizar(req.params.id, cambios) });
+    res.json({ mensaje: 'Torneo actualizado', torneo: await torneoModel.actualizar(torneo.id, cambios) });
   } catch (error) {
     fallo(res, error, 'Error al actualizar el torneo');
   }
 };
 
+const ESTADOS_TORNEO = ['Activo', 'Finalizado', 'Cancelado'];
+const SIN_JUGAR = ['Programado', 'Aplazado'];
+
+// Finalizar, cancelar o reabrir un torneo. Cerrarlo cancela sus partidos sin jugar (solo con confirmación: forzar) y avisa a los participantes.
+// Cuerpo: { estado: 'Activo' | 'Finalizado' | 'Cancelado', forzar?: boolean }
+export const cambiarEstadoTorneo = async (req, res) => {
+  try {
+    const torneo = req.torneo;
+    const { estado, forzar } = req.body ?? {};
+    if (!ESTADOS_TORNEO.includes(estado)) return res.status(400).json({ mensaje: `El estado debe ser: ${ESTADOS_TORNEO.join(', ')}` });
+    if (torneo.estado === estado) return res.status(409).json({ mensaje: `El torneo ya está ${estado.toLowerCase()}` });
+
+    let canceladas = 0;
+    if (estado !== 'Activo') {
+      const partidos = datos(await supabase.from('eventos_calendario').select('id, estado').eq('torneo_id', torneo.id).eq('tipo', 'Partido'));
+      const enVivo = partidos.filter((p) => p.estado === 'En vivo');
+      const pendientes = partidos.filter((p) => SIN_JUGAR.includes(p.estado));
+      if (enVivo.length) return res.status(409).json({ mensaje: `Hay ${enVivo.length} partido(s) en vivo. Termínalos antes de ${estado === 'Finalizado' ? 'finalizar' : 'cancelar'} el torneo` });
+      if (pendientes.length && !forzar) {
+        return res.status(409).json({ mensaje: `Hay ${pendientes.length} partido(s) sin jugar. Confirma para cancelarlos y cerrar el torneo` });
+      }
+      if (pendientes.length) {
+        datos(await supabase.from('eventos_calendario').update({ estado: 'Cancelado' }).in('id', pendientes.map((p) => p.id)));
+        canceladas = pendientes.length;
+      }
+    }
+
+    const actualizado = await torneoModel.actualizar(torneo.id, { estado });
+    avisarTorneoEstado(torneo, estado, req.usuario.id); // sin await: no hace esperar la respuesta
+    res.json({ mensaje: `Torneo ${estado === 'Activo' ? 'reabierto' : estado.toLowerCase()}`, torneo: actualizado, canceladas });
+  } catch (error) {
+    fallo(res, error, 'Error al cambiar el estado del torneo');
+  }
+};
+
+// Eliminar un torneo y todo lo que depende de él. Si ya tiene partidos jugados o en juego no se borra: se cancela, para conservar el historial.
 export const eliminarTorneo = async (req, res) => {
   try {
-    await torneoModel.eliminar(req.params.id);
+    const torneo = req.torneo;
+    const [inscripciones, eventos] = await Promise.all([
+      supabase.from('inscripciones_equipo').select('id').eq('torneo_id', torneo.id).then(datos),
+      supabase.from('eventos_calendario').select('id, tipo, estado').eq('torneo_id', torneo.id).then(datos),
+    ]);
+    if (eventos.some((e) => e.tipo === 'Partido' && ['Finalizado', 'En vivo'].includes(e.estado))) {
+      return res.status(409).json({ mensaje: 'El torneo ya tiene partidos jugados o en juego: no se puede eliminar. Puedes cancelarlo o finalizarlo para conservar el historial' });
+    }
+
+    await avisarTorneoEliminado(torneo, req.usuario.id); // antes de borrar: necesita las inscripciones para saber a quién avisar
+
+    const borrar = async (tabla, columna, ids, opcional = false) => {
+      if (!ids.length) return;
+      try {
+        datos(await supabase.from(tabla).delete().in(columna, ids));
+      } catch (e) {
+        if (!opcional) throw e;
+        console.warn(`No se pudo limpiar ${tabla}:`, e.message); // tablas que pueden no existir en tu base
+      }
+    };
+    const idsEventos = eventos.map((e) => e.id);
+    const idsInscripciones = inscripciones.map((i) => i.id);
+    await borrar('estadisticas_jugador', 'evento_id', idsEventos);
+    await borrar('partido_arbitros', 'evento_id', idsEventos);
+    await borrar('eventos_calendario', 'id', idsEventos);
+    await borrar('tabla_posiciones', 'inscripcion_id', idsInscripciones);
+    await borrar('inscripciones_equipo', 'id', idsInscripciones);
+    await borrar('grupos_torneo', 'torneo_id', [torneo.id], true);
+    await borrar('favoritos', 'torneo_id', [torneo.id], true);
+    await borrar('scout_ai_recomendaciones', 'torneo_id', [torneo.id], true);
+    await torneoModel.eliminar(torneo.id);
     res.json({ mensaje: 'Torneo eliminado' });
   } catch (error) {
     fallo(res, error, 'Error al eliminar el torneo');

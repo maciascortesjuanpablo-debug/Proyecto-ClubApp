@@ -1,6 +1,7 @@
 import { supabase } from '../config/supabase.js';
 import { datos } from './helpers.js';
 import { destinatariosDeEquipos, notificarVarios } from '../models/notificaciones.js';
+import { inscripcionModel } from '../models/inscripciones.js';
 
 // Avisos automáticos de partidos. Nunca rompen la acción principal: si algo falla, solo se registra en consola.
 // Se llaman SIN await desde los controladores para no hacer esperar la respuesta.
@@ -101,4 +102,39 @@ export const avisarFixtureCreado = seguro(async (torneo, partidos, nombres, acto
       { tipo: 'torneo', referencia_id: torneo.id },
     );
   }
+});
+
+// Personas a las que les importa un torneo: integrantes de los equipos aceptados y árbitros de sus partidos
+const participantesDeTorneo = async (torneo_id) => {
+  const [inscripciones, eventos] = await Promise.all([
+    supabase.from('inscripciones_equipo').select('equipo_id').eq('torneo_id', torneo_id).eq('estado', 'Aceptado').then(datos),
+    supabase.from('eventos_calendario').select('id').eq('torneo_id', torneo_id).then(datos),
+  ]);
+  const [personas, arbitros] = await Promise.all([
+    destinatariosDeEquipos(inscripciones.map((i) => i.equipo_id)),
+    eventos.length ? supabase.from('partido_arbitros').select('usuario_id').in('evento_id', eventos.map((e) => e.id)).then(datos) : [],
+  ]);
+  return [...personas, ...arbitros.map((a) => a.usuario_id)];
+};
+
+// El organizador finalizó, canceló o reabrió el torneo
+export const avisarTorneoEstado = seguro(async (torneo, estado, actorId) => {
+  let titulo;
+  if (estado === 'Finalizado') {
+    // Líder de la tabla al cerrar (mismo criterio de desempate que la tabla de posiciones)
+    const tabla = await inscripcionModel.obtenerTablaPorTorneo(torneo.id);
+    const lider = [...tabla].sort((a, b) => b.puntos - a.puntos || (b.goles_favor - b.goles_contra) - (a.goles_favor - a.goles_contra) || b.goles_favor - a.goles_favor)[0];
+    const nombre = lider?.puntos > 0 ? lider.inscripciones_equipo?.equipos?.nombre : null;
+    titulo = `El torneo "${torneo.nombre}" finalizó.${nombre ? ` Líder de la tabla: ${nombre}.` : ''}`;
+  } else if (estado === 'Cancelado') {
+    titulo = `El torneo "${torneo.nombre}" fue cancelado. Sus partidos sin jugar quedaron cancelados.`;
+  } else {
+    titulo = `El torneo "${torneo.nombre}" fue reabierto.`;
+  }
+  await notificarVarios(sinActor(await participantesDeTorneo(torneo.id), actorId), titulo, { tipo: 'torneo', referencia_id: torneo.id });
+});
+
+// El torneo se eliminó: se avisa ANTES de borrarlo (después ya no se sabría quiénes participaban)
+export const avisarTorneoEliminado = seguro(async (torneo, actorId) => {
+  await notificarVarios(sinActor(await participantesDeTorneo(torneo.id), actorId), `El torneo "${torneo.nombre}" fue eliminado por su organizador.`, { tipo: 'general' });
 });

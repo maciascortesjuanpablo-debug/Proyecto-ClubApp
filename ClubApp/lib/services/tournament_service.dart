@@ -94,7 +94,17 @@ class TournamentService {
     return r['exito'] == true ? Resultado.ok(toLista(r['datos']).map(Torneo.fromJson).toList()) : Resultado.fallo(r['mensaje'].toString());
   }
 
-  static Future<Map<String, dynamic>> cambiarEstado(Object id, String estado) => ApiClient.pedir('PUT', '/torneos/$id', cuerpo: {'estado': estado});
+  // ---- Gestión del torneo (organizador dueño o admin) ----
+
+  /// Finalizar, cancelar o reabrir ('Finalizado', 'Cancelado' o 'Activo'). Si hay partidos sin jugar, [forzar] confirma que se cancelen.
+  static Future<Map<String, dynamic>> cambiarEstado(Object id, String estado, {bool forzar = false}) =>
+      ApiClient.pedir('PUT', '/torneos/$id/estado', cuerpo: {'estado': estado, if (forzar) 'forzar': true});
+
+  /// Edita nombre, ciudad, máximo de equipos, jornadas totales y (si aún no hay partidos) deporte y formato
+  static Future<Map<String, dynamic>> actualizar(Object id, Map<String, dynamic> cambios) => ApiClient.pedir('PUT', '/torneos/$id', cuerpo: cambios);
+
+  /// Solo si el torneo no tiene partidos jugados o en juego
+  static Future<Map<String, dynamic>> eliminar(Object id) => ApiClient.pedir('DELETE', '/torneos/$id');
 
   // ---- Fixture automático (solo organizador dueño del torneo o admin) ----
 
