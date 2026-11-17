@@ -91,9 +91,9 @@ ${datosActuales}
 const RECORDATORIO = 'Recordatorio: responde únicamente al siguiente mensaje del usuario, con una respuesta nueva. No copies ni repitas respuestas anteriores, no escribas etiquetas de rol y mantente en ClubApp.';
 const REINTENTO = 'Tu borrador repite lo que ya dijiste antes. Escribe una respuesta NUEVA solo para el siguiente mensaje del usuario: otras palabras, sin copiar frases ni pasos anteriores. Si ya lo explicaste, di lo esencial de forma distinta y pregunta qué parte no quedó clara.';
 
-/* ============================================================
-   1. CHAT CON SCOUT AI
-   ============================================================ */
+
+  //1. CHAT CON SCOUT AI
+
 export const chatConScout = async (req, res) => {
   try {
     const mensaje = texto(req.body.mensaje, 1000);
@@ -177,9 +177,9 @@ export const chatConScout = async (req, res) => {
   }
 };
 
-/* ============================================================
-   2. HISTORIAL DE UNA CONVERSACION (solo la del dueño)
-   ============================================================ */
+
+  // 2. HISTORIAL DE UNA CONVERSACION (solo la del dueño)
+  
 export const obtenerHistorialScout = async (req, res) => {
   try {
     const { conversacionId } = req.params;
@@ -193,9 +193,9 @@ export const obtenerHistorialScout = async (req, res) => {
   }
 };
 
-/* ============================================================
-   3. RECOMENDAR JUGADOR PARA UN TORNEO
-   ============================================================ */
+
+   //3. RECOMENDAR JUGADOR PARA UN TORNEO
+
 export const recomendarJugador = async (req, res) => {
   try {
     const { conversacionId, torneoId } = req.body;
@@ -248,9 +248,9 @@ Responde UNICAMENTE en formato JSON, sin texto adicional, con esta forma exacta:
   }
 };
 
-/* ============================================================
-   4. GENERAR REPORTE DE EQUIPO
-   ============================================================ */
+
+   //4. GENERAR REPORTE DE EQUIPO
+
 export const generarReporteEquipo = async (req, res) => {
   try {
     const { equipoId, tipo, periodoInicio, periodoFin } = req.body;
@@ -299,9 +299,9 @@ y basado unicamente en los datos entregados. Si faltan datos, aclaralo en vez de
   }
 };
 
-/* ============================================================
-   5. CONVERSACIONES: listar, renombrar y eliminar (solo las del dueño)
-   ============================================================ */
+
+   //5. CONVERSACIONES: listar, renombrar y eliminar (solo las del dueño)
+
 export const listarConversaciones = async (req, res) => {
   try {
     const conversaciones = datos(await supabase.from('scout_ai_conversaciones').select('*')

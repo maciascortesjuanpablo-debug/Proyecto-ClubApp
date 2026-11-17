@@ -46,7 +46,7 @@ class _LoginPageState extends State<LoginPage> {
 
   if (resultado['exito'] != true) return mostrarError(context, resultado['mensaje']);
 
-  // Contraseña correcta: falta confirmar con el código que llegó al correo
+  
 if (resultado['requiere2fa'] == true) {
   Navigator.push(
     context,
