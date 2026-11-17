@@ -14,6 +14,7 @@ import '../services/profile_service.dart';
 import 'change_password_page.dart';
 import 'edit_profile_page.dart';
 import 'admin_page.dart';
+import 'help_support_page.dart';
 
 /// Perfil de la persona. La cabecera, los datos personales y las acciones son comunes;
 /// lo que hay en medio depende del rol: el jugador ve sus estadísticas de juego, el entrenador sus equipos,
@@ -382,6 +383,7 @@ class _ProfilePageState extends State<ProfilePage> {
   Widget get _acciones => Column(children: [
         _accion(Icons.edit_outlined, 'Editar perfil', _editar),
         _accion(Icons.lock_outline, 'Cambiar contraseña', () => Navigator.push(context, MaterialPageRoute(builder: (_) => const ChangePasswordPage()))),
+        _accion(Icons.help_outline, 'Ayuda y soporte', () => Navigator.push(context, MaterialPageRoute(builder: (_) => const HelpSupportPage()))),
         _accion(Icons.logout, 'Cerrar sesión', _cerrarSesion),
         _accion(Icons.delete_outline, 'Eliminar cuenta', _eliminarCuenta, color: AppColors.error),
       ]);
