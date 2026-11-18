@@ -1,5 +1,7 @@
+import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import '../core/app_colors.dart';
+import '../core/legal_texts.dart';
 import '../core/navigation.dart';
 import '../core/validators.dart';
 import '../components/app_button.dart';
@@ -49,14 +51,56 @@ class _RegisterPage3State extends State<RegisterPage3> {
   bool _cargando = false;
   PasswordStrength _strength = AppValidators.checkPasswordStrength('');
 
+  late final TapGestureRecognizer _tapTerminos;
+  late final TapGestureRecognizer _tapPrivacidad;
+
+  @override
+  void initState() {
+    super.initState();
+    _tapTerminos = TapGestureRecognizer()
+      ..onTap = () => _mostrarLegal('Términos y condiciones', LegalTexts.terminos);
+    _tapPrivacidad = TapGestureRecognizer()
+      ..onTap = () => _mostrarLegal('Política de privacidad', LegalTexts.politicaDatos);
+  }
+
   @override
   void dispose() {
+    _tapTerminos.dispose();
+    _tapPrivacidad.dispose();
     _passwordController.dispose();
     _confirmPasswordController.dispose();
     super.dispose();
   }
 
   void _aviso(String texto) => ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(texto)));
+
+  // Ventana emergente con el texto legal completo. "Aceptar" marca la casilla.
+  Future<void> _mostrarLegal(String titulo, String texto) async {
+    final acepto = await showDialog<bool>(
+      context: context,
+      builder: (d) => AlertDialog(
+        backgroundColor: AppColors.bgCard,
+        title: Text(titulo, style: const TextStyle(color: AppColors.textWhite, fontSize: 18, fontWeight: FontWeight.bold)),
+        content: SizedBox(
+          width: double.maxFinite,
+          height: MediaQuery.of(d).size.height * 0.55,
+          child: Scrollbar(
+            child: SingleChildScrollView(
+              child: Text(texto.trim(), style: const TextStyle(color: AppColors.textGray, fontSize: 13, height: 1.5)),
+            ),
+          ),
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(d, false), child: const Text('Cerrar')),
+          TextButton(
+            onPressed: () => Navigator.pop(d, true),
+            child: const Text('Aceptar', style: TextStyle(color: AppColors.secondary, fontWeight: FontWeight.bold)),
+          ),
+        ],
+      ),
+    );
+    if (acepto == true && mounted) setState(() => _acceptTerms = true);
+  }
 
   // Convierte DD/MM/YYYY (DatePickerField) a yyyy-MM-dd (backend)
   String _formatearFecha(String fecha) {
@@ -65,69 +109,68 @@ class _RegisterPage3State extends State<RegisterPage3> {
   }
 
   Future<void> _register() async {
-  if (!(_formKey.currentState?.validate() ?? false)) return;
-  if (!_acceptTerms) return _aviso('Debes aceptar los términos y condiciones');
+    if (!(_formKey.currentState?.validate() ?? false)) return;
+    if (!_acceptTerms) return _aviso('Debes aceptar los términos y la política de privacidad');
 
-  setState(() => _cargando = true);
+    setState(() => _cargando = true);
 
-  final registro = await AuthService.registrar(
-    nombre: widget.nombre,
-    apellido: widget.apellido,
-    correo: widget.correo,
-    numeroCelular: widget.celular,
-    fechaNacimiento: _formatearFecha(widget.fechaNacimiento),
-    ciudad: widget.ciudad,
-    password: _passwordController.text,
-    rolId: widget.rolId,
-    nivelJuego: widget.nivelJuego,
-  );
+    final registro = await AuthService.registrar(
+      nombre: widget.nombre,
+      apellido: widget.apellido,
+      correo: widget.correo,
+      numeroCelular: widget.celular,
+      fechaNacimiento: _formatearFecha(widget.fechaNacimiento),
+      ciudad: widget.ciudad,
+      password: _passwordController.text,
+      rolId: widget.rolId,
+      nivelJuego: widget.nivelJuego,
+    );
 
-  if (registro['exito'] != true) {
+    if (registro['exito'] != true) {
+      if (!mounted) return;
+      setState(() => _cargando = false);
+      return _aviso(registro['mensaje']);
+    }
+
+    final login = await AuthService.iniciarSesion(correo: widget.correo, password: _passwordController.text);
+
     if (!mounted) return;
     setState(() => _cargando = false);
-    return _aviso(registro['mensaje']);
-  }
 
-  final login = await AuthService.iniciarSesion(correo: widget.correo, password: _passwordController.text);
+    // Si el inicio de sesión automático falla, la cuenta ya existe: se manda al login
+    if (login['exito'] != true) return irALogin(context);
 
-  if (!mounted) return;
-  setState(() => _cargando = false);
+    final mensaje = 'Bienvenido a ClubApp, ${widget.nombre}';
 
-  // Si el inicio de sesión automático falla, la cuenta ya existe: se manda al login
-  if (login['exito'] != true) return irALogin(context);
-
-
-  final mensaje = 'Bienvenido a ClubApp, ${widget.nombre}';
-
-  // El código llega al correo con el que se registró, así también se confirma que es suyo
-  if (login['requiere2fa'] == true) {
-    Navigator.pushAndRemoveUntil(
-      context,
-      MaterialPageRoute(
-        builder: (_) => TwoFactorPage(
-          tokenDesafio: login['tokenDesafio'] as String,
-          correo: login['correo'] as String,
-          titulo: '¡Cuenta Creada!',
-          mensaje: mensaje,
-          posicionPerfil: widget.posicion,
-          desdeRegistro: true,
+    // El código llega al correo con el que se registró, así también se confirma que es suyo
+    if (login['requiere2fa'] == true) {
+      Navigator.pushAndRemoveUntil(
+        context,
+        MaterialPageRoute(
+          builder: (_) => TwoFactorPage(
+            tokenDesafio: login['tokenDesafio'] as String,
+            correo: login['correo'] as String,
+            titulo: '¡Cuenta Creada!',
+            mensaje: mensaje,
+            posicionPerfil: widget.posicion,
+            desdeRegistro: true,
+          ),
         ),
-      ),
-      (_) => false,
-    );
-    return;
-  }
+        (_) => false,
+      );
+      return;
+    }
 
-  if (widget.posicion.isNotEmpty) await AuthService.crearPerfilJugador(posicion: widget.posicion);
-  if (!mounted) return;
-  await SuccessDialog.show(
-    context: context,
-    title: '¡Cuenta Creada!',
-    message: mensaje,
-    buttonText: 'Empezar',
-    onButtonPressed: () => irAInicio(context),
-  );
-}
+    if (widget.posicion.isNotEmpty) await AuthService.crearPerfilJugador(posicion: widget.posicion);
+    if (!mounted) return;
+    await SuccessDialog.show(
+      context: context,
+      title: '¡Cuenta Creada!',
+      message: mensaje,
+      buttonText: 'Empezar',
+      onButtonPressed: () => irAInicio(context),
+    );
+  }
 
   Widget get _requirementsCard => Container(
         padding: const EdgeInsets.all(16),
@@ -161,6 +204,39 @@ class _RegisterPage3State extends State<RegisterPage3> {
           Text(texto, style: TextStyle(fontSize: 13, color: color)),
         ],
       ),
+    );
+  }
+
+  Widget get _aceptarTerminos {
+    final base = Theme.of(context).textTheme.bodySmall?.copyWith(color: AppColors.textGray);
+    final enlace = base?.copyWith(color: AppColors.secondary, decoration: TextDecoration.underline);
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Checkbox(
+          value: _acceptTerms,
+          onChanged: (v) => setState(() => _acceptTerms = v ?? false),
+          activeColor: AppColors.primaryLight,
+          checkColor: AppColors.textWhite,
+        ),
+        Expanded(
+          child: Padding(
+            padding: const EdgeInsets.only(top: 12),
+            child: Text.rich(
+              TextSpan(
+                style: base,
+                children: [
+                  const TextSpan(text: 'Acepto los '),
+                  TextSpan(text: 'Términos y condiciones', style: enlace, recognizer: _tapTerminos),
+                  const TextSpan(text: ' y autorizo el tratamiento de mis datos según la '),
+                  TextSpan(text: 'Política de privacidad', style: enlace, recognizer: _tapPrivacidad),
+                  const TextSpan(text: '.'),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ],
     );
   }
 
@@ -207,20 +283,7 @@ class _RegisterPage3State extends State<RegisterPage3> {
                     const SizedBox(height: 20),
                     _requirementsCard,
                     const SizedBox(height: 20),
-                    Row(
-                      children: [
-                        Checkbox(
-                          value: _acceptTerms,
-                          onChanged: (v) => setState(() => _acceptTerms = v ?? false),
-                          activeColor: AppColors.primaryLight,
-                          checkColor: AppColors.textWhite,
-                        ),
-                        Expanded(
-                          child: Text('Acepto los términos y condiciones',
-                              style: Theme.of(context).textTheme.bodySmall?.copyWith(color: AppColors.textGray)),
-                        ),
-                      ],
-                    ),
+                    _aceptarTerminos,
                   ],
                 ),
                 const SizedBox(height: 32),
