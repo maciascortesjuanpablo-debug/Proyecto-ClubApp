@@ -2,6 +2,8 @@ import bcrypt from 'bcrypt';
 import { usuarioModel } from '../models/usuario.js';
 import { enviarCorreoConfirmacionCambio } from '../utils/sendEmail.js';
 import { respuestaSesion } from '../utils/token.js';
+import { VERSION_POLITICA, edadDe, estadoConsentimiento } from '../utils/consentimiento.js';
+import { DIAS_PURGA } from '../utils/purga.js';
 import { FECHA_RE, MSG_PASSWORD, ROLES, ROLES_REGISTRO, fallo, passwordValida, pick, texto } from '../utils/helpers.js';
 
 const EDITABLES = ['nombre', 'apellido', 'numero_celular', 'fecha_nacimiento', 'ciudad', 'nivel_juego'];
@@ -54,15 +56,50 @@ export const actualizarUsuario = async (req, res) => {
   }
 };
 
+// Desactiva la cuenta ya y programa el borrado de los datos personales (ver utils/purga.js)
 export const eliminarUsuario = async (req, res) => {
   try {
-    await usuarioModel.eliminar(req.params.id);
-    res.json({ mensaje: 'Usuario desactivado exitosamente' });
+    await usuarioModel.programarEliminacion(req.params.id, new Date(Date.now() + DIAS_PURGA * 24 * 3600 * 1000));
+    res.json({ mensaje: `Cuenta desactivada. Tus datos personales se eliminarán en ${DIAS_PURGA} días` });
   } catch (error) {
     fallo(res, error, 'Error al eliminar el usuario');
   }
 };
 
+
+// ¿Esta cuenta tiene la autorización vigente? (la app lo consulta al abrir con una sesión guardada)
+export const consultarConsentimiento = async (req, res) => {
+  res.json(await estadoConsentimiento(req.usuario.id));
+};
+
+// Registra la aceptación de los términos y la política (cuentas de Google y cuentas anteriores a esta versión).
+// Si no hay fecha de nacimiento se pide aquí; un menor de 18 años necesita la autorización de su acudiente.
+export const aceptarTerminos = async (req, res) => {
+  try {
+    if (req.body.acepta_terminos !== true) return res.status(400).json({ mensaje: 'Debes aceptar los términos y la política de privacidad' });
+    if (req.body.version_politica !== VERSION_POLITICA) return res.status(400).json({ mensaje: 'Los términos cambiaron: actualiza la aplicación e inténtalo de nuevo' });
+
+    const actual = await usuarioModel.consentimiento(req.usuario.id);
+    const cambios = {};
+    let fecha = actual?.fecha_nacimiento ? String(actual.fecha_nacimiento).slice(0, 10) : null;
+    if (edadDe(fecha) === null) {
+      fecha = req.body.fecha_nacimiento;
+      if (edadDe(fecha) === null) return res.status(400).json({ mensaje: 'La fecha de nacimiento es obligatoria y debe ser válida' });
+      cambios.fecha_nacimiento = fecha;
+    }
+    const menor = edadDe(fecha) < 18;
+    if (menor && req.body.autorizacion_acudiente !== true) {
+      return res.status(400).json({ mensaje: 'Los menores de 18 años necesitan la autorización de su padre, madre o representante legal' });
+    }
+
+    await usuarioModel.registrarAceptacion(req.usuario.id, {
+      ...cambios, acepto_terminos_en: new Date().toISOString(), version_politica: VERSION_POLITICA, autorizacion_acudiente: menor,
+    });
+    res.json({ mensaje: 'Aceptación registrada' });
+  } catch (error) {
+    fallo(res, error, 'Error al registrar la aceptación');
+  }
+};
 
 // Cambiar la contraseña estando logueado: exige la actual
 export const cambiarPassword = async (req, res) => {

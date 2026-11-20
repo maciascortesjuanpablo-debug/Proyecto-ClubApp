@@ -53,7 +53,7 @@ class ProfileService {
   static Future<Map<String, dynamic>> cambiarPassword({required String actual, required String nueva}) =>
       _pedir('POST', '/usuarios/cambiar-password', cuerpo: {'passwordActual': actual, 'nuevaPassword': nueva});
 
-  /// Desactiva la cuenta (no se borran los datos)
+  /// Desactiva la cuenta ya; el servidor borra los datos personales a los 30 días
   static Future<Map<String, dynamic>> eliminarCuenta() => _pedir('DELETE', '/usuarios/$_id');
 
   /// Sube la foto de perfil (jpg, png o webp, máx. 5 MB). Devuelve el perfil actualizado en 'perfil'

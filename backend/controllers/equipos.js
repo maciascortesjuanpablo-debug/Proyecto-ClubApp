@@ -1,7 +1,8 @@
 import { supabase } from '../config/supabase.js';
 import { equipoModel } from '../models/equipos.js';
 import { panelModel } from '../models/panel.js';
-import { ROLES, datos, fallo, pick, texto } from '../utils/helpers.js';
+import { ROLES, datos, entero, fallo, pick, texto } from '../utils/helpers.js';
+import { usuarioConRol } from '../utils/usuarios.js';
 import { esDuenoEquipo } from '../utils/permisos.js';
 import { eliminarImagen } from '../utils/cloudinaryutils.js';
 
@@ -62,7 +63,7 @@ export const crearEquipo = async (req, res) => {
 
     const ficha = camposEquipo(req.body);
     if (ficha.error) return res.status(400).json({ mensaje: ficha.error });
-    const basico = { nombre, logo_url: req.body.logo_url };
+    const basico = { nombre }; // el escudo se sube por PUT /:id/logo (no se acepta una URL cualquiera)
     let equipo;
     let aviso;
     try {
@@ -72,12 +73,8 @@ export const crearEquipo = async (req, res) => {
       if (!/creado_por|eslogan|descripcion|ciudad|formato|formacion|max_jugadores|color_principal|schema cache/.test(error.message)) throw error;
       console.warn('⚠️  Faltan columnas de equipos (ver backend/sql/001 y 002)');
       aviso = 'El equipo se creó solo con su nombre: falta ejecutar backend/sql/002_equipos_ampliado.sql en Supabase';
-      try {
-        equipo = await equipoModel.crear({ ...basico, creado_por: req.usuario.id });
-      } catch (e2) {
-        if (!/creado_por/.test(e2.message)) throw e2;
-        equipo = await equipoModel.crear(basico);
-      }
+      // Nunca se crea un equipo sin dueño: si falta la columna creado_por, el error sube
+      equipo = await equipoModel.crear({ ...basico, creado_por: req.usuario.id });
     }
     res.status(201).json({ mensaje: 'Equipo creado', equipo, aviso });
   } catch (error) {
@@ -107,7 +104,8 @@ export const actualizarEquipo = async (req, res) => {
   try {
     const ficha = camposEquipo(req.body);
     if (ficha.error) return res.status(400).json({ mensaje: ficha.error });
-    const cambios = { ...pick(req.body, ['nombre', 'logo_url']), ...ficha.campos };
+    const cambios = { ...pick(req.body, ['nombre']), ...ficha.campos };
+    if ('nombre' in cambios && !(cambios.nombre = texto(cambios.nombre, 80))) return res.status(400).json({ mensaje: 'El nombre del equipo no puede estar vacío' });
     if (!Object.keys(cambios).length) return res.status(400).json({ mensaje: 'No hay campos válidos para actualizar' });
     res.json({ mensaje: 'Equipo actualizado', equipo: await equipoModel.actualizar(req.params.id, cambios) });
   } catch (error) {
@@ -128,13 +126,17 @@ export const eliminarEquipo = async (req, res) => {
 
 export const agregarJugadorEquipo = async (req, res) => {
   try {
-    const { usuario_id, posicion, dorsal } = req.body;
+    const { usuario_id, dorsal } = req.body;
+    const posicion = texto(req.body.posicion, 40);
     if (!usuario_id || !posicion) return res.status(400).json({ mensaje: 'usuario_id y posicion son obligatorios' });
+    const dorsalN = dorsal === undefined || dorsal === null || dorsal === '' ? undefined : entero(dorsal, 0, 999);
+    if (dorsalN === null) return res.status(400).json({ mensaje: 'El dorsal debe ser un número entre 0 y 999' });
+    if (!(await usuarioConRol(usuario_id, [ROLES.JUGADOR]))) return res.status(400).json({ mensaje: 'El usuario no existe, está inactivo o no es jugador' });
     if (await equipoModel.buscarJugador(req.params.id, usuario_id)) {
       return res.status(409).json({ mensaje: 'El jugador ya está en el equipo' });
     }
     if (await plantillaLlena(req.equipo ?? (await equipoModel.buscarPorId(req.params.id)))) return res.status(409).json({ mensaje: 'La plantilla ya alcanzó su cupo de jugadores' });
-    const jugador = await equipoModel.agregarJugador({ equipo_id: req.params.id, usuario_id, posicion, dorsal });
+    const jugador = await equipoModel.agregarJugador({ equipo_id: req.params.id, usuario_id, posicion, dorsal: dorsalN });
     res.status(201).json({ mensaje: 'Jugador agregado al equipo', jugador });
   } catch (error) {
     fallo(res, error, 'Error al agregar el jugador');
@@ -153,6 +155,9 @@ export const actualizarJugadorEquipo = async (req, res) => {
   try {
     const cambios = pick(req.body, ['posicion', 'dorsal', 'estado_convocatoria', 'es_titular', 'slot_campo']);
     if (!Object.keys(cambios).length) return res.status(400).json({ mensaje: 'No hay campos válidos para actualizar' });
+    if ('posicion' in cambios && !(cambios.posicion = texto(cambios.posicion, 40))) return res.status(400).json({ mensaje: 'La posición no puede estar vacía' });
+    if ('dorsal' in cambios && cambios.dorsal !== null && (cambios.dorsal = entero(cambios.dorsal, 0, 999)) === null) return res.status(400).json({ mensaje: 'El dorsal debe ser un número entre 0 y 999' });
+    if ('es_titular' in cambios && typeof cambios.es_titular !== 'boolean') return res.status(400).json({ mensaje: 'es_titular debe ser verdadero o falso' });
     res.json({ mensaje: 'Jugador actualizado', jugador: await equipoModel.actualizarJugador(req.params.id, req.params.usuarioId, cambios) });
   } catch (error) {
     fallo(res, error, 'Error al actualizar el jugador');
@@ -172,8 +177,10 @@ export const eliminarJugadorEquipo = async (req, res) => {
 
 export const agregarStaffEquipo = async (req, res) => {
   try {
-    const { usuario_id, cargo } = req.body;
+    const { usuario_id } = req.body;
+    const cargo = texto(req.body.cargo, 60);
     if (!usuario_id || !cargo) return res.status(400).json({ mensaje: 'usuario_id y cargo son obligatorios' });
+    if (!(await usuarioConRol(usuario_id))) return res.status(400).json({ mensaje: 'El usuario no existe o está inactivo' });
     const staff = await equipoModel.agregarStaff({ equipo_id: req.params.id, usuario_id, cargo });
     res.status(201).json({ mensaje: 'Staff agregado', staff });
   } catch (error) {

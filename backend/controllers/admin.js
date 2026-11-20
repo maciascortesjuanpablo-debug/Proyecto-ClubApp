@@ -146,6 +146,7 @@ export const actualizarUsuarioAdmin = async (req, res) => {
       if (typeof req.body[campo] !== 'boolean') return res.status(400).json({ mensaje: `${campo} debe ser verdadero o falso` });
       cambios[campo] = req.body[campo];
     }
+    if (cambios.activo === true) cambios.eliminacion_programada_en = null; // reactivar cancela una eliminación programada
     if ('correo' in req.body) {
       const correo = normalizarCorreo(req.body.correo);
       if (!correoValido(correo)) return res.status(400).json({ mensaje: 'El correo no es válido' });

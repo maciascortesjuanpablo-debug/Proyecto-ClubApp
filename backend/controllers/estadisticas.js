@@ -7,7 +7,6 @@ import { ROLES, datos, entero, esAdmin, fallo } from '../utils/helpers.js';
 import { esDuenoEquipo, esOrganizadorTorneo } from '../utils/permisos.js';
 
 const NUMERICOS = ['goles', 'asistencias', 'tarjetas_amarillas', 'tarjetas_rojas', 'minutos_jugados'];
-const LIMITES = { minutos_jugados: 300 };
 
 // Admin; organizador del torneo del evento; árbitro asignado; o entrenador del equipo (si juega ese partido)
 const puedeRegistrar = async (req, evento_id, equipo_id) => {
@@ -30,7 +29,7 @@ const leerNumericos = (body, porDefecto) => {
   const salida = {};
   for (const c of NUMERICOS) {
     if (body[c] === undefined && porDefecto === undefined) continue;
-    const v = entero(body[c] ?? porDefecto, 0, LIMITES[c] ?? 99);
+    const v = entero(body[c] ?? porDefecto, 0, LIMITES_PARTIDO[c] ?? 99);
     if (v === null) return null;
     salida[c] = v;
   }
@@ -48,6 +47,16 @@ export const crearEstadistica = async (req, res) => {
     if (!(await puedeRegistrar(req, evento_id, equipo_id))) {
       return res.status(403).json({ mensaje: 'No puedes registrar estadísticas de este partido' });
     }
+
+    // Mismas reglas que el guardado masivo: partido jugado, jugador de la plantilla y una sola fila por jugador
+    const evento = await calendarioModel.buscarPorId(evento_id);
+    if (evento.tipo !== 'Partido' || !['En vivo', 'Finalizado'].includes(evento.estado)) {
+      return res.status(409).json({ mensaje: 'Las estadísticas se registran cuando el partido está en vivo o finalizado' });
+    }
+    const plantilla = (await equipoModel.listarJugadores(equipo_id)).map((j) => String(j.usuarios?.id));
+    if (!plantilla.includes(String(usuario_id))) return res.status(400).json({ mensaje: 'El jugador no pertenece a la plantilla del equipo' });
+    const previas = datos(await supabase.from('estadisticas_jugador').select('id').eq('evento_id', evento_id).eq('usuario_id', usuario_id).limit(1));
+    if (previas.length) return res.status(409).json({ mensaje: 'Ese jugador ya tiene estadísticas en este partido: actualízalas' });
 
     const estadistica = await estadisticaModel.crear({ evento_id, usuario_id, equipo_id, ...numeros });
     res.status(201).json({ mensaje: 'Estadística registrada', estadistica });

@@ -5,12 +5,13 @@ import { usuarioModel } from '../models/usuario.js';
 import { codigoVerificacionModel } from '../models/verificar_codigo.js';
 import { enviarCorreoCodigo, enviarCorreoConfirmacionCambio, generarCodigo, CODIGO_MINUTOS } from '../utils/sendEmail.js';
 import { firmarReset, huella } from '../utils/token.js';
+import { crearLimiteIntentos } from '../utils/intentos.js';
 import { MSG_PASSWORD, fallo, normalizarCorreo, passwordValida } from '../utils/helpers.js';
 
 const TIPO = 'recuperar_password';
 const MAX_INTENTOS = 5;
 // Intentos fallidos por usuario (en memoria: se reinicia con el servidor)
-const intentos = new Map();
+const intentos = crearLimiteIntentos(MAX_INTENTOS);
 
 // PASO 1: enviar código al correo
 export const enviarCodigo = async (req, res) => {
@@ -23,8 +24,6 @@ export const enviarCodigo = async (req, res) => {
     if (!usuario || !usuario.activo) return res.json({ mensaje: 'Si el correo existe, se envió un código' });
 
     await codigoVerificacionModel.invalidarPendientes(usuario.id, TIPO);
-    intentos.delete(usuario.id);
-
     const codigo = generarCodigo();
     await codigoVerificacionModel.crear({
       usuario_id: usuario.id, codigo, tipo: TIPO,
@@ -52,18 +51,18 @@ export const verificarCodigo = async (req, res) => {
     const usuario = await usuarioModel.buscarPorCorreo(correo);
     if (!usuario || !usuario.activo) return invalido();
 
-    if ((intentos.get(usuario.id) ?? 0) >= MAX_INTENTOS) {
+    if (intentos.bloqueado(usuario.id)) {
       await codigoVerificacionModel.invalidarPendientes(usuario.id, TIPO);
       return res.status(429).json({ mensaje: 'Demasiados intentos, solicita un código nuevo' });
     }
 
     const codigoValido = await codigoVerificacionModel.buscarValido({ usuario_id: usuario.id, codigo });
     if (!codigoValido) {
-      intentos.set(usuario.id, (intentos.get(usuario.id) ?? 0) + 1);
+      intentos.fallo(usuario.id);
       return invalido();
     }
 
-    intentos.delete(usuario.id);
+    intentos.limpiar(usuario.id);
     await codigoVerificacionModel.marcarUsado(codigoValido.id);
 
     const { password_hash } = await usuarioModel.buscarConHash(usuario.id);

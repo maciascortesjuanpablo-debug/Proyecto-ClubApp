@@ -3,6 +3,7 @@
 
     <application
         android:label="ClubApp"
+        android:allowBackup="false"
         android:name="${applicationName}"
         android:icon="@mipmap/launcher_icon">
         <activity

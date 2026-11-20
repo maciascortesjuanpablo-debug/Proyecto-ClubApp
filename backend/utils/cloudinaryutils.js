@@ -1,11 +1,15 @@
 import cloudinary from '../config/cloudinary.js';
 
+// Solo se aceptan imágenes de NUESTRA cuenta de Cloudinary y de las carpetas de la app:
+// así una URL manipulada nunca puede hacer borrar otra imagen
 export function obtenerPublicId(url) {
-  if (!url) return null;
+  if (typeof url !== 'string' || !url) return null;
+  if (!url.startsWith(`https://res.cloudinary.com/${process.env.CLOUDINARY_CLOUD_NAME}/`)) return null;
   const partes = url.split('/upload/')[1];
   if (!partes) return null;
   const sinVersion = partes.replace(/^v\d+\//, '');
-  return sinVersion.replace(/\.[^/.]+$/, '');
+  const publicId = sinVersion.replace(/\.[^/.]+$/, '');
+  return publicId.startsWith('clubapp/') && !publicId.includes('..') ? publicId : null;
 }
 
 export async function eliminarImagen(url) {
