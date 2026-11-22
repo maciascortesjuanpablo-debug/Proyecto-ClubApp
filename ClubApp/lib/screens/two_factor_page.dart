@@ -4,6 +4,7 @@ import '../core/navigation.dart';
 import '../components/code_verification_view.dart';
 import '../components/success_dialog.dart';
 import '../services/auth_service.dart';
+import '../services/profile_service.dart';
 
 /// Segundo paso del inicio de sesión: código de 6 dígitos enviado al correo
 class TwoFactorPage extends StatelessWidget {
@@ -12,6 +13,7 @@ class TwoFactorPage extends StatelessWidget {
   final String titulo;
   final String mensaje;
   final String? posicionPerfil; // al registrarse: perfil de jugador que se crea al verificar
+  final String? fotoPerfil; // al registrarse: foto elegida, se sube al verificar
   final bool desdeRegistro;
 
   const TwoFactorPage({
@@ -21,6 +23,7 @@ class TwoFactorPage extends StatelessWidget {
     this.titulo = '¡Bienvenido de vuelta!',
     this.mensaje = 'Verificación exitosa',
     this.posicionPerfil,
+    this.fotoPerfil,
     this.desdeRegistro = false,
   });
 
@@ -38,7 +41,7 @@ class TwoFactorPage extends StatelessWidget {
           final r = await AuthService.verificarDosPasos(tokenDesafio: tokenDesafio, codigo: codigo);
           if (r['exito'] != true) return r['mensaje'].toString();
           // Ya hay sesión: se puede crear el perfil de jugador pendiente del registro
-          if (posicionPerfil?.isNotEmpty ?? false) await AuthService.crearPerfilJugador(posicion: posicionPerfil!);
+          if (desdeRegistro) await ProfileService.crearPerfilInicial(posicion: posicionPerfil ?? '', fotoPath: fotoPerfil);
           if (!context.mounted) return null;
           await SuccessDialog.show(context: context, title: titulo, message: mensaje, onButtonPressed: () => irAInicio(context));
           return null;

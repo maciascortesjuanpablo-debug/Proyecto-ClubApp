@@ -53,7 +53,15 @@ class ProfileService {
   static Future<Map<String, dynamic>> cambiarPassword({required String actual, required String nueva}) =>
       _pedir('POST', '/usuarios/cambiar-password', cuerpo: {'passwordActual': actual, 'nuevaPassword': nueva});
 
-  /// Desactiva la cuenta (no se borran los datos)
+  /// Tras registrarse (ya con sesión): crea el perfil si hay posición o foto y sube la foto elegida.
+  /// Si algo falla no bloquea el ingreso: la foto se puede poner luego desde "Mi Perfil".
+  static Future<void> crearPerfilInicial({required String posicion, String? fotoPath}) async {
+    if (posicion.isEmpty && fotoPath == null) return;
+    await AuthService.crearPerfilJugador(posicion: posicion);
+    if (fotoPath != null) await subirFoto(fotoPath);
+  }
+
+  /// Desactiva la cuenta ya; el servidor borra los datos personales a los 30 días
   static Future<Map<String, dynamic>> eliminarCuenta() => _pedir('DELETE', '/usuarios/$_id');
 
   /// Sube la foto de perfil (jpg, png o webp, máx. 5 MB). Devuelve el perfil actualizado en 'perfil'

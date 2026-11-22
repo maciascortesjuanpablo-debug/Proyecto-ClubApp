@@ -12,6 +12,7 @@ import '../components/form_section.dart';
 import '../components/progress_bar.dart';
 import '../components/success_dialog.dart';
 import '../services/auth_service.dart';
+import '../services/profile_service.dart';
 import 'two_factor_page.dart';
 
 class RegisterPage3 extends StatefulWidget {
@@ -24,6 +25,7 @@ class RegisterPage3 extends StatefulWidget {
   final String posicion;
   final int rolId;
   final String nivelJuego;
+  final String? fotoPath; // foto de perfil elegida en el paso 2 (opcional)
 
   const RegisterPage3({
     super.key,
@@ -36,6 +38,7 @@ class RegisterPage3 extends StatefulWidget {
     required this.posicion,
     required this.rolId,
     required this.nivelJuego,
+    this.fotoPath,
   });
 
   @override
@@ -48,6 +51,7 @@ class _RegisterPage3State extends State<RegisterPage3> {
   final _confirmPasswordController = TextEditingController();
 
   bool _acceptTerms = false;
+  bool _autorizaAcudiente = false;
   bool _cargando = false;
   PasswordStrength _strength = AppValidators.checkPasswordStrength('');
 
@@ -102,6 +106,18 @@ class _RegisterPage3State extends State<RegisterPage3> {
     if (acepto == true && mounted) setState(() => _acceptTerms = true);
   }
 
+  // ¿Menor de 18 años? Se calcula con la fecha de nacimiento del paso 1 (DD/MM/YYYY)
+  bool get _esMenor {
+    final p = widget.fechaNacimiento.split('/');
+    if (p.length != 3) return false;
+    final d = int.tryParse(p[0]), m = int.tryParse(p[1]), y = int.tryParse(p[2]);
+    if (d == null || m == null || y == null) return false;
+    final hoy = DateTime.now();
+    var edad = hoy.year - y;
+    if (hoy.month < m || (hoy.month == m && hoy.day < d)) edad--;
+    return edad < 18;
+  }
+
   // Convierte DD/MM/YYYY (DatePickerField) a yyyy-MM-dd (backend)
   String _formatearFecha(String fecha) {
     final p = fecha.split('/');
@@ -111,6 +127,7 @@ class _RegisterPage3State extends State<RegisterPage3> {
   Future<void> _register() async {
     if (!(_formKey.currentState?.validate() ?? false)) return;
     if (!_acceptTerms) return _aviso('Debes aceptar los términos y la política de privacidad');
+    if (_esMenor && !_autorizaAcudiente) return _aviso('Siendo menor de edad necesitas la autorización de tu padre, madre o representante legal');
 
     setState(() => _cargando = true);
 
@@ -124,6 +141,7 @@ class _RegisterPage3State extends State<RegisterPage3> {
       password: _passwordController.text,
       rolId: widget.rolId,
       nivelJuego: widget.nivelJuego,
+      autorizacionAcudiente: _esMenor && _autorizaAcudiente,
     );
 
     if (registro['exito'] != true) {
@@ -153,6 +171,7 @@ class _RegisterPage3State extends State<RegisterPage3> {
             titulo: '¡Cuenta Creada!',
             mensaje: mensaje,
             posicionPerfil: widget.posicion,
+            fotoPerfil: widget.fotoPath,
             desdeRegistro: true,
           ),
         ),
@@ -161,7 +180,7 @@ class _RegisterPage3State extends State<RegisterPage3> {
       return;
     }
 
-    if (widget.posicion.isNotEmpty) await AuthService.crearPerfilJugador(posicion: widget.posicion);
+    await ProfileService.crearPerfilInicial(posicion: widget.posicion, fotoPath: widget.fotoPath);
     if (!mounted) return;
     await SuccessDialog.show(
       context: context,
@@ -240,6 +259,27 @@ class _RegisterPage3State extends State<RegisterPage3> {
     );
   }
 
+  Widget get _autorizacionAcudiente {
+    final base = Theme.of(context).textTheme.bodySmall?.copyWith(color: AppColors.textGray);
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Checkbox(
+          value: _autorizaAcudiente,
+          onChanged: (v) => setState(() => _autorizaAcudiente = v ?? false),
+          activeColor: AppColors.primaryLight,
+          checkColor: AppColors.textWhite,
+        ),
+        Expanded(
+          child: Padding(
+            padding: const EdgeInsets.only(top: 12),
+            child: Text('Soy menor de 18 años y mi padre, madre o representante legal autoriza mi uso de ClubApp y el tratamiento de mis datos.', style: base),
+          ),
+        ),
+      ],
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -284,6 +324,7 @@ class _RegisterPage3State extends State<RegisterPage3> {
                     _requirementsCard,
                     const SizedBox(height: 20),
                     _aceptarTerminos,
+                    if (_esMenor) _autorizacionAcudiente,
                   ],
                 ),
                 const SizedBox(height: 32),

@@ -3,21 +3,34 @@ import { usuarioModel } from '../models/usuario.js';
 import { ROLES, esAdmin, esMismoUsuario } from '../utils/helpers.js';
 
 // Verifica que el usuario esté logueado (token de sesión válido)
-export const verificarToken = (req, res, next) => {
+export const verificarToken = async (req, res, next) => {
   const authHeader = req.headers.authorization;
 
   if (!authHeader?.startsWith('Bearer ')) {
     return res.status(401).json({ mensaje: 'No autorizado, falta el token' });
   }
 
+  let payload;
   try {
-    const payload = jwt.verify(authHeader.split(' ')[1], process.env.JWT_SECRET);
+    payload = jwt.verify(authHeader.split(' ')[1], process.env.JWT_SECRET);
     // Los tokens temporales (recuperar contraseña) no sirven como sesión
     if (payload.proposito) throw new Error('token no es de sesión');
-    req.usuario = payload; // { id, rol_id }
-    next();
   } catch {
     return res.status(401).json({ mensaje: 'Token inválido o expirado' });
+  }
+
+  // El estado y el rol se leen de la base en cada petición: una cuenta desactivada o con otro rol
+  // pierde el acceso de inmediato, sin esperar a que venza el token
+  try {
+    const usuario = await usuarioModel.buscarPorId(payload.id);
+    if (!usuario || usuario.activo === false) {
+      return res.status(401).json({ mensaje: 'La cuenta no existe o está inactiva' });
+    }
+    req.usuario = { id: usuario.id, rol_id: usuario.rol_id };
+    next();
+  } catch (error) {
+    console.error('Verificando sesión:', error);
+    res.status(500).json({ mensaje: 'Error al verificar la sesión' });
   }
 };
 

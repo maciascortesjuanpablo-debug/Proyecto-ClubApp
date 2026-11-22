@@ -5,6 +5,7 @@ import { inscripcionModel } from '../models/inscripciones.js';
 import { FECHA_RE, HORA_RE, ROLES, ahora, datos, entero, esAdmin, fallo, pick, texto } from '../utils/helpers.js';
 import { esOrganizadorTorneo } from '../utils/permisos.js';
 import { recalcularSeguro } from '../utils/posiciones.js';
+import { usuarioConRol } from '../utils/usuarios.js';
 import { avisarArbitro, avisarCambioPartido, avisarPartidoProgramado } from '../utils/avisos.js';
 
 const ESTADOS = ['Programado', 'En vivo', 'Finalizado', 'Aplazado', 'Cancelado'];
@@ -181,7 +182,11 @@ export const crearEvento = async (req, res) => {
     }
     const pasado = errorDePasado(fecha, hora);
     if (pasado) return res.status(400).json({ mensaje: pasado });
-    if (!(await torneoGestionable(req, res, torneo_id))) return;
+    const torneo = await torneoGestionable(req, res, torneo_id);
+    if (!torneo) return;
+    if (['Finalizado', 'Cancelado'].includes(torneo.estado)) {
+      return res.status(409).json({ mensaje: 'El torneo está cerrado: no se pueden programar más eventos' });
+    }
 
     if (tipo === 'Partido') {
       const error = await validarPartido(torneo_id, equipo_local_id, equipo_visitante_id);
@@ -269,7 +274,8 @@ export const registrarResultado = async (req, res) => {
     if (!evento) return res.status(404).json({ mensaje: 'Evento no encontrado' });
 
     const torneo = await torneoModel.buscarPorId(evento.torneo_id);
-    const permitido = (torneo && esOrganizadorTorneo(req, torneo)) || esAdmin(req) || (await calendarioModel.esArbitroDelEvento(evento.id, req.usuario.id));
+    const gestor = (torneo && esOrganizadorTorneo(req, torneo)) || esAdmin(req);
+    const permitido = gestor || (await calendarioModel.esArbitroDelEvento(evento.id, req.usuario.id));
     if (!permitido) return res.status(403).json({ mensaje: 'Solo el organizador o el árbitro asignado pueden registrar el resultado' });
 
     const cambios = pick(req.body, ['estado', 'resultado_local', 'resultado_visitante']);
@@ -284,6 +290,19 @@ export const registrarResultado = async (req, res) => {
     const final = { ...evento, ...cambios };
     if (final.estado === 'Finalizado' && (final.resultado_local == null || final.resultado_visitante == null)) {
       return res.status(400).json({ mensaje: 'Para finalizar el partido indica el marcador de los dos equipos' });
+    }
+
+    // El árbitro solo lleva el partido: no reabre ni corrige un partido cerrado (eso lo decide el organizador)
+    if (!gestor) {
+      if (['Finalizado', 'Cancelado'].includes(evento.estado)) {
+        return res.status(409).json({ mensaje: 'Solo el organizador puede modificar un partido finalizado o cancelado' });
+      }
+      if (cambios.estado && !['En vivo', 'Finalizado'].includes(cambios.estado)) {
+        return res.status(403).json({ mensaje: 'El árbitro solo puede poner el partido en vivo o finalizarlo' });
+      }
+    }
+    if (('resultado_local' in cambios || 'resultado_visitante' in cambios) && !['En vivo', 'Finalizado'].includes(final.estado)) {
+      return res.status(400).json({ mensaje: 'El marcador solo se registra con el partido en vivo o finalizado' });
     }
 
     const actualizado = await calendarioModel.actualizar(evento.id, cambios);
@@ -319,13 +338,15 @@ export const arbitrosDisponibles = async (req, res) => {
 
 export const asignarArbitro = async (req, res) => {
   try {
-    const { usuario_id, rol_arbitraje } = req.body;
+    const { usuario_id } = req.body;
+    const rolArbitraje = texto(req.body.rol_arbitraje, 30) || 'Principal';
     if (!usuario_id) return res.status(400).json({ mensaje: 'usuario_id es obligatorio' });
+    if (!(await usuarioConRol(usuario_id, [ROLES.ARBITRO]))) return res.status(400).json({ mensaje: 'El usuario no existe, está inactivo o no es árbitro' });
     if (await calendarioModel.esArbitroDelEvento(req.params.id, usuario_id)) {
       return res.status(409).json({ mensaje: 'Ese árbitro ya está asignado al evento' });
     }
-    const arbitro = await calendarioModel.asignarArbitro({ evento_id: req.params.id, usuario_id, rol_arbitraje: rol_arbitraje || 'Principal' });
-    avisarArbitro(req.evento ?? (await calendarioModel.buscarPorId(req.params.id)), usuario_id, rol_arbitraje || 'Principal', req.usuario.id); // NOTIFICACIONES: avisa al árbitro
+    const arbitro = await calendarioModel.asignarArbitro({ evento_id: req.params.id, usuario_id, rol_arbitraje: rolArbitraje });
+    avisarArbitro(req.evento ?? (await calendarioModel.buscarPorId(req.params.id)), usuario_id, rolArbitraje, req.usuario.id); // NOTIFICACIONES: avisa al árbitro
     res.status(201).json({ mensaje: 'Árbitro asignado', arbitro });
   } catch (error) {
     fallo(res, error, 'Error al asignar el árbitro');

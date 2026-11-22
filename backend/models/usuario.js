@@ -52,4 +52,18 @@ export const usuarioModel = {
   async eliminar(id) {
     datos(await usuarios().update({ activo: false, actualizado_en: new Date() }).eq('id', id));
   },
+
+  // Eliminación pedida por la propia persona: se desactiva ya y sus datos se borran en la fecha indicada
+  async programarEliminacion(id, fecha) {
+    datos(await usuarios().update({ activo: false, eliminacion_programada_en: fecha.toISOString(), actualizado_en: new Date() }).eq('id', id));
+  },
+
+  // Datos para saber si la autorización de la persona está vigente
+  async consentimiento(id) {
+    return datos(await usuarios().select('fecha_nacimiento, version_politica').eq('id', id).maybeSingle());
+  },
+
+  async registrarAceptacion(id, campos) {
+    datos(await usuarios().update({ ...campos, actualizado_en: new Date() }).eq('id', id));
+  },
 };

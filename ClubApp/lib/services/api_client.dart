@@ -22,12 +22,12 @@ class ApiClient {
       if (r.statusCode == 401) await AuthService.logout(); // token vencido
       final data = jsonDecode(r.body);
       if (r.statusCode < 200 || r.statusCode > 299) {
-        debugPrint('API $metodo $ruta → ${r.statusCode}: ${r.body}');
+        if (kDebugMode) debugPrint('API $metodo $ruta → ${r.statusCode}: ${r.body}'); // nunca en release
         return {'exito': false, 'status': r.statusCode, 'mensaje': (data is Map ? data['mensaje'] : null) ?? 'Ocurrió un error'};
       }
       return data is Map<String, dynamic> ? {...data, 'exito': true} : {'exito': true, 'datos': data};
     } catch (e) {
-      debugPrint('API $metodo $ruta falló: $e');
+      if (kDebugMode) debugPrint('API $metodo $ruta falló: $e');
       return {'exito': false, 'mensaje': 'No se pudo conectar al servidor'};
     }
   }

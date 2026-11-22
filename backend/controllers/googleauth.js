@@ -2,6 +2,7 @@ import { OAuth2Client } from 'google-auth-library';
 import { usuarioModel } from '../models/usuario.js';
 import { respuestaSesion } from '../utils/token.js';
 import { fallo, normalizarCorreo } from '../utils/helpers.js';
+import { estadoConsentimiento } from '../utils/consentimiento.js';
 
 const client = new OAuth2Client();
 // GOOGLE_CLIENT_ID admite varios ids separados por coma (el de tipo "Web" que usa la app como serverClientId, el de iOS, etc.)
@@ -42,6 +43,9 @@ export const autenticarConGoogle = async (req, res) => {
 
       // Vincula Google si faltaba
       const cambios = {};
+      // Anti pre-secuestro: si la cuenta tenía contraseña pero nunca se comprobó que el correo fuera de quien la creó,
+      // esa contraseña pudo ponerla un tercero. Google demuestra quién es el dueño del correo: se borra la contraseña.
+      if (!usuario.googleId && !usuario.correo_verificado && usuario.password_hash) cambios.password_hash = null;
       if (!usuario.googleId) cambios.googleId = googleId;
       if (!usuario.avatar && avatar) cambios.avatar = avatar;
       if (!usuario.isVerified) cambios.isVerified = true;
@@ -54,7 +58,7 @@ export const autenticarConGoogle = async (req, res) => {
 
     const sesion = respuestaSesion(usuario, existia ? 'Inicio de sesión exitoso con Google' : 'Registro exitoso con Google');
     // `nuevo` le dice a la app que debe pedir el rol (la cuenta nace como "Usuario")
-    res.json({ ...sesion, nuevo: !existia, usuario: { ...sesion.usuario, avatar: usuario.avatar || avatar } });
+    res.json({ ...sesion, nuevo: !existia, ...(await estadoConsentimiento(usuario.id)), usuario: { ...sesion.usuario, avatar: usuario.avatar || avatar } });
   } catch (error) {
     fallo(res, error, 'Error al autenticar con Google');
   }

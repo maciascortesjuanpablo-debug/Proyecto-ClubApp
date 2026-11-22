@@ -136,7 +136,7 @@ class _ProfilePageState extends State<ProfilePage> {
       builder: (d) => AlertDialog(
         backgroundColor: AppColors.bgCard,
         title: const Text('Eliminar cuenta', style: TextStyle(color: AppColors.textWhite)),
-        content: const Text('Tu cuenta se desactivará y no podrás volver a entrar con ella. Esta acción no se puede deshacer.', style: TextStyle(color: AppColors.textGray)),
+        content: const Text('Tu cuenta se desactivará ahora y tus datos personales se eliminarán en 30 días. No podrás volver a entrar con ella. Esta acción no se puede deshacer.', style: TextStyle(color: AppColors.textGray)),
         actions: [
           TextButton(onPressed: () => Navigator.pop(d, false), child: const Text('Cancelar')),
           TextButton(onPressed: () => Navigator.pop(d, true), child: const Text('Eliminar', style: TextStyle(color: AppColors.error))),

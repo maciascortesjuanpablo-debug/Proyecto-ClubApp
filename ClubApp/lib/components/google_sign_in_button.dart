@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../core/navigation.dart';
+import '../screens/consentimiento_page.dart';
 import '../screens/google_profile_page.dart';
 import '../services/auth_service.dart';
 import 'app_dialogs.dart';
@@ -26,8 +27,14 @@ class _GoogleSignInButtonState extends State<GoogleSignInButton> {
     if (r['exito'] != true) return mostrarError(context, r['mensaje'].toString());
 
     if (r['nuevo'] == true) {
-      // Cuenta nueva: elige su rol antes de entrar
-      Navigator.pushAndRemoveUntil(context, MaterialPageRoute(builder: (_) => const GoogleProfilePage()), (_) => false);
+      // Cuenta nueva: primero acepta los términos y la política, luego elige su rol
+      void irAPerfil(BuildContext c) =>
+          Navigator.pushAndRemoveUntil(c, MaterialPageRoute(builder: (_) => const GoogleProfilePage()), (_) => false);
+      if (AuthService.consentimientoPendiente != null) {
+        Navigator.pushAndRemoveUntil(context, MaterialPageRoute(builder: (_) => ConsentimientoPage(alAceptar: irAPerfil)), (_) => false);
+      } else {
+        irAPerfil(context);
+      }
     } else {
       irAInicio(context);
 

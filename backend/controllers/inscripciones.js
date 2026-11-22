@@ -2,7 +2,8 @@ import { inscripcionModel } from '../models/inscripciones.js';
 import { equipoModel } from '../models/equipos.js';
 import { torneoModel } from '../models/torneos.js';
 import { notificar } from '../models/notificaciones.js';
-import { fallo } from '../utils/helpers.js';
+import { ROLES, fallo } from '../utils/helpers.js';
+import { usuarioConRol } from '../utils/usuarios.js';
 import { plantillaLlena } from './equipos.js';
 import { esDuenoEquipo, esOrganizadorTorneo } from '../utils/permisos.js';
 
@@ -96,6 +97,7 @@ export const crearInvitacion = async (req, res) => {
     const equipo = await equipoModel.buscarPorId(equipo_id);
     if (!equipo) return res.status(404).json({ mensaje: 'Equipo no encontrado' });
     if (!esDuenoEquipo(req, equipo)) return res.status(403).json({ mensaje: 'Solo el dueño del equipo puede invitar' });
+    if (!(await usuarioConRol(usuario_id, [ROLES.JUGADOR]))) return res.status(400).json({ mensaje: 'El usuario no existe, está inactivo o no es jugador' });
     if (await equipoModel.buscarJugador(equipo_id, usuario_id)) return res.status(409).json({ mensaje: 'Ese jugador ya está en el equipo' });
     if (await plantillaLlena(equipo)) return res.status(409).json({ mensaje: 'La plantilla ya alcanzó su cupo de jugadores' });
     if (await inscripcionModel.buscarInvitacionPendiente(equipo_id, usuario_id)) {

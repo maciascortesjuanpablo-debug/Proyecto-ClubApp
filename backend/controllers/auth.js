@@ -3,6 +3,8 @@ import jwt from 'jsonwebtoken';
 import { usuarioModel } from '../models/usuario.js';
 import { codigoVerificacionModel } from '../models/verificar_codigo.js';
 import { firmarSesion } from '../utils/token.js';
+import { crearLimiteIntentos } from '../utils/intentos.js';
+import { VERSION_POLITICA, edadDe, estadoConsentimiento } from '../utils/consentimiento.js';
 import { enviarCorreoCodigo, generarCodigo, CODIGO_MINUTOS } from '../utils/sendEmail.js';
 import { ROLES_REGISTRO, MSG_PASSWORD, fallo, normalizarCorreo, correoValido, passwordValida, texto } from '../utils/helpers.js';
 
@@ -11,7 +13,7 @@ const HASH_FALSO = bcrypt.hashSync('relleno-sin-uso', 10);
 
 const TIPO_2FA = 'login_2fa';
 const MAX_INTENTOS = 5;
-const intentos = new Map(); // intentos fallidos por usuario (en memoria: se reinicia con el servidor)
+const intentos = crearLimiteIntentos(MAX_INTENTOS); // intentos fallidos por usuario (en memoria; no se reinician al reenviar el código)
 
 // El segundo paso está activo salvo que en el .env pongas DOS_PASOS=false
 const dosPasosActivo = () => process.env.DOS_PASOS !== 'false';
@@ -22,7 +24,6 @@ const respuestaSesion = (u) => ({ mensaje: 'Inicio de sesión exitoso', token: f
 // Genera y envía el código; devuelve el token del desafío que la app usa para verificar o reenviar
 const enviarDesafio = async (usuario) => {
   await codigoVerificacionModel.invalidarPendientes(usuario.id, TIPO_2FA);
-  intentos.delete(usuario.id);
   const codigo = generarCodigo();
   await codigoVerificacionModel.crear({
     usuario_id: usuario.id, codigo, tipo: TIPO_2FA,
@@ -44,7 +45,7 @@ const idDelDesafio = (token) => {
 
 export const registrar = async (req, res) => {
   try {
-    const { numero_celular, fecha_nacimiento, ciudad, password, rol_id, nivel_juego } = req.body;
+    const { numero_celular, fecha_nacimiento, ciudad, password, rol_id, nivel_juego, acepta_terminos, version_politica, autorizacion_acudiente } = req.body;
     const nombre = texto(req.body.nombre, 60);
     const apellido = texto(req.body.apellido, 60);
     const correo = normalizarCorreo(req.body.correo);
@@ -56,6 +57,14 @@ export const registrar = async (req, res) => {
     if (!passwordValida(password)) return res.status(400).json({ mensaje: MSG_PASSWORD });
     if (fecha_nacimiento && !/^\d{4}-\d{2}-\d{2}$/.test(fecha_nacimiento)) {
       return res.status(400).json({ mensaje: 'La fecha de nacimiento debe tener formato AAAA-MM-DD' });
+    }
+    // Autorización de datos: se exige y se guarda como prueba (fecha y versión del texto aceptado)
+    if (acepta_terminos !== true) return res.status(400).json({ mensaje: 'Debes aceptar los términos y la política de privacidad' });
+    if (version_politica !== VERSION_POLITICA) return res.status(400).json({ mensaje: 'Los términos cambiaron: actualiza la aplicación e inténtalo de nuevo' });
+    const edad = edadDe(fecha_nacimiento);
+    if (edad === null) return res.status(400).json({ mensaje: 'La fecha de nacimiento es obligatoria y debe ser válida' });
+    if (edad < 18 && autorizacion_acudiente !== true) {
+      return res.status(400).json({ mensaje: 'Los menores de 18 años necesitan la autorización de su padre, madre o representante legal' });
     }
     if (rol_id !== undefined && !ROLES_REGISTRO.includes(Number(rol_id))) {
       return res.status(400).json({ mensaje: 'Rol no permitido' });
@@ -71,6 +80,9 @@ export const registrar = async (req, res) => {
       fecha_nacimiento: fecha_nacimiento || null,
       ciudad: texto(ciudad) || null,
       password_hash: await bcrypt.hash(password, 10),
+      acepto_terminos_en: new Date().toISOString(),
+      version_politica: VERSION_POLITICA,
+      autorizacion_acudiente: edad < 18,
       ...(rol_id !== undefined && { rol_id: Number(rol_id) }),
       ...(nivel_juego && { nivel_juego: texto(nivel_juego, 30) }),
     });
@@ -102,7 +114,7 @@ export const iniciarSesion = async (req, res) => {
       return res.status(403).json({ mensaje: 'Esta cuenta está inactiva' });
     }
 
-    res.json(dosPasosActivo() ? await enviarDesafio(usuario) : respuestaSesion(usuario));
+    res.json(dosPasosActivo() ? await enviarDesafio(usuario) : { ...respuestaSesion(usuario), ...(await estadoConsentimiento(usuario.id)) });
   } catch (error) {
     fallo(res, error, 'Error al iniciar sesión');
   }
@@ -119,24 +131,27 @@ export const verificarDosPasos = async (req, res) => {
     const invalido = () => res.status(400).json({ mensaje: 'Código incorrecto o expirado' });
     if (!/^\d{6}$/.test(codigo)) return invalido();
 
-    if ((intentos.get(id) ?? 0) >= MAX_INTENTOS) {
+    if (intentos.bloqueado(id)) {
       await codigoVerificacionModel.invalidarPendientes(id, TIPO_2FA);
       return res.status(429).json({ mensaje: 'Demasiados intentos, solicita un código nuevo' });
     }
 
     const valido = await codigoVerificacionModel.buscarValido({ usuario_id: id, codigo, tipo: TIPO_2FA });
     if (!valido) {
-      intentos.set(id, (intentos.get(id) ?? 0) + 1);
+      intentos.fallo(id);
       return invalido();
     }
 
-    intentos.delete(id);
+    intentos.limpiar(id);
     await codigoVerificacionModel.marcarUsado(valido.id);
 
     const usuario = await usuarioModel.buscarPorId(id);
     if (!usuario || usuario.activo === false) return res.status(403).json({ mensaje: 'Esta cuenta está inactiva' });
 
-    res.json(respuestaSesion(usuario));
+    // Haber recibido el código en el correo prueba que la persona es su dueña
+    if (!usuario.correo_verificado) await usuarioModel.actualizarUsuario(usuario.id, { correo_verificado: true });
+
+    res.json({ ...respuestaSesion(usuario), ...(await estadoConsentimiento(usuario.id)) });
   } catch (error) {
     fallo(res, error, 'Error al verificar el código');
   }

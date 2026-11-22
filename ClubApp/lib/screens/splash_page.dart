@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import '../core/app_colors.dart';
 import '../core/app_constants.dart';
 import '../services/auth_service.dart';
+import '../core/navigation.dart';
+import 'consentimiento_page.dart';
 import 'login_page.dart';
 import 'main_shell.dart';
 
@@ -31,7 +33,13 @@ class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderSt
     if (!mounted) return;
     Navigator.pushReplacement(
       context,
-      MaterialPageRoute(builder: (_) => AuthService.isLoggedIn ? const MainShell() : const LoginPage()),
+      MaterialPageRoute(
+        builder: (_) => !AuthService.isLoggedIn
+            ? const LoginPage()
+            : AuthService.consentimientoPendiente != null
+                ? const ConsentimientoPage(alAceptar: irAInicio)
+                : const MainShell(),
+      ),
     );
   }
 

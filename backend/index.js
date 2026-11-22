@@ -4,6 +4,7 @@ import cors from 'cors';
 import helmet from 'helmet';
 import { conectaDB } from './config/supabase.js';
 import { limiteGeneral } from './middlewares/limites.js';
+import { purgarVencidos } from './utils/purga.js';
 
 import authRoutes from './routes/auth.js';
 import usuarioRoutes from './routes/usuario.js';
@@ -27,6 +28,7 @@ conectaDB();
 const app = express();
 // Detrás de un proxy (Render, Railway...) define TRUST_PROXY=1 para que el límite de peticiones use la IP real
 if (process.env.TRUST_PROXY) app.set('trust proxy', Number(process.env.TRUST_PROXY));
+else if (process.env.RENDER) app.set('trust proxy', 1); // Render siempre va detrás de un proxy: sin esto todos compartirían la misma IP en el límite de peticiones
 app.use(helmet());
 app.use(cors());
 
@@ -36,6 +38,7 @@ app.get('/', (req, res) => res.status(200).json({ estado: 'ok' }));
 app.get('/health', (req, res) => res.status(200).send('OK'));
 
 app.use(express.json({ limit: '100kb' }));
+app.use((req, res, next) => { req.body ??= {}; next(); }); // Express 5 deja req.body sin definir cuando no hay cuerpo JSON
 app.use(limiteGeneral);
 
 const rutas = {
@@ -72,3 +75,8 @@ app.use((err, req, res, next) => {
 
 const port = process.env.PORT || 3000;
 app.listen(port, () => console.log(`✅ Servidor escuchando en http://localhost:${port}`));
+
+// Borrado real de cuentas: cada 6 horas se anonimizan las que pidieron eliminación hace más de 30 días
+const purgar = () => purgarVencidos().catch((e) => console.error('[PURGA] falló:', e.message));
+setTimeout(purgar, 60_000).unref();
+setInterval(purgar, 6 * 3600 * 1000).unref();

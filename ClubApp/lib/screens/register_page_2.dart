@@ -1,4 +1,6 @@
+import 'dart:io';
 import 'package:flutter/material.dart';
+import 'package:image_picker/image_picker.dart';
 import '../core/app_colors.dart';
 import '../components/app_button.dart';
 import '../components/app_text_field.dart';
@@ -43,6 +45,7 @@ class _RegisterPage2State extends State<RegisterPage2> {
   String? _selectedRole;
   String? _selectedCity;
   String _selectedLevel = 'Amateur Competitivo';
+  String? _fotoPath; // foto elegida: se sube cuando la cuenta ya existe (al terminar el registro)
 
   @override
   void dispose() {
@@ -51,6 +54,68 @@ class _RegisterPage2State extends State<RegisterPage2> {
   }
 
   void _aviso(String texto) => ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(texto)));
+
+  Future<void> _elegirFoto() async {
+    final foto = await ImagePicker().pickImage(source: ImageSource.gallery, maxWidth: 1000, imageQuality: 85);
+    if (foto == null || !mounted) return;
+    if (!['jpg', 'jpeg', 'png', 'webp'].contains(foto.path.split('.').last.toLowerCase())) return _aviso('Usa una imagen JPG, PNG o WEBP');
+    setState(() => _fotoPath = foto.path);
+  }
+
+  // Círculo de la foto de perfil: toca para elegir o cambiar; "Quitar foto" la borra
+  Widget get _selectorFoto => Center(
+        child: Column(
+          children: [
+            GestureDetector(
+              onTap: _elegirFoto,
+              child: Stack(
+                clipBehavior: Clip.none,
+                children: [
+                  Container(
+                    width: 100,
+                    height: 100,
+                    decoration: BoxDecoration(
+                      color: AppColors.primaryLight.withValues(alpha: 0.3),
+                      shape: BoxShape.circle,
+                      border: Border.all(color: AppColors.primaryLight, width: 2),
+                      image: _fotoPath == null ? null : DecorationImage(image: FileImage(File(_fotoPath!)), fit: BoxFit.cover),
+                    ),
+                    child: _fotoPath != null
+                        ? null
+                        : const Column(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Icon(Icons.person, color: AppColors.primaryLight, size: 50),
+                              SizedBox(height: 4),
+                              Text('+ Foto', style: TextStyle(color: AppColors.primaryLight, fontSize: 11, fontWeight: FontWeight.w600)),
+                            ],
+                          ),
+                  ),
+                  Positioned(
+                    right: 0,
+                    bottom: 0,
+                    child: CircleAvatar(
+                      radius: 15,
+                      backgroundColor: AppColors.primaryLight,
+                      child: Icon(_fotoPath == null ? Icons.add_a_photo : Icons.edit, size: 16, color: AppColors.textWhite),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            if (_fotoPath != null)
+              TextButton(
+                onPressed: () => setState(() => _fotoPath = null),
+                child: const Text('Quitar foto', style: TextStyle(color: AppColors.textGray, fontSize: 12)),
+              )
+            else
+              const Padding(
+                padding: EdgeInsets.only(top: 8),
+                child: Text('Opcional', style: TextStyle(color: AppColors.textGray, fontSize: 11)),
+              ),
+          ],
+        ),
+      );
 
   void _continuar() {
     if (_selectedRole == null) return _aviso('Por favor selecciona un rol');
@@ -68,6 +133,7 @@ class _RegisterPage2State extends State<RegisterPage2> {
           posicion: _positionController.text.trim(),
           rolId: _roles[_selectedRole]!.$2,
           nivelJuego: _selectedLevel,
+          fotoPath: _fotoPath,
         ),
       ),
     );
@@ -127,25 +193,7 @@ class _RegisterPage2State extends State<RegisterPage2> {
                   title: 'Tu perfil deportivo',
                   subtitle: 'Complétalo aquí',
                   children: [
-                    Center(
-                      child: Container(
-                        width: 100,
-                        height: 100,
-                        decoration: BoxDecoration(
-                          color: AppColors.primaryLight.withValues(alpha: 0.3),
-                          shape: BoxShape.circle,
-                          border: Border.all(color: AppColors.primaryLight, width: 2),
-                        ),
-                        child: const Column(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            Icon(Icons.person, color: AppColors.primaryLight, size: 50),
-                            SizedBox(height: 4),
-                            Text('+ Foto', style: TextStyle(color: AppColors.primaryLight, fontSize: 11, fontWeight: FontWeight.w600)),
-                          ],
-                        ),
-                      ),
-                    ),
+                    _selectorFoto,
                     const SizedBox(height: 28),
                     AppTextField(label: 'Posición en el campo', hint: 'Ej: Delantero, Portero...', controller: _positionController),
                     const SizedBox(height: 16),

@@ -4,6 +4,7 @@ import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:google_sign_in/google_sign_in.dart';
 import 'package:http/http.dart' as http;
 import '../config/api_config.dart';
+import '../core/legal_texts.dart';
 
 class AuthService {
   // El token se guarda cifrado (Keystore en Android, Keychain en iOS)
@@ -16,6 +17,10 @@ class AuthService {
 
   static String? _token;
   static Map<String, dynamic>? _usuario;
+
+  /// Si no es null, la cuenta debe aceptar la versión vigente de los términos antes de entrar (ver ConsentimientoPage).
+  /// Trae {falta_fecha_nacimiento, es_menor}.
+  static Map<String, dynamic>? consentimientoPendiente;
 
   static bool get isLoggedIn => _token != null;
   static bool get isGuest => !isLoggedIn;
@@ -34,9 +39,44 @@ class AuthService {
       }
       _token = token;
       _usuario = jsonDecode(usuario) as Map<String, dynamic>;
+      await refrescarConsentimiento();
     } catch (_) {
       await logout();
     }
+  }
+
+  static void _guardarConsentimiento(Map<String, dynamic> r) {
+    consentimientoPendiente = r['requiere_aceptacion'] == true
+        ? {'falta_fecha_nacimiento': r['falta_fecha_nacimiento'] == true, 'es_menor': r['es_menor'] == true}
+        : null;
+  }
+
+  /// Consulta al servidor si la sesión guardada ya aceptó la versión vigente. Si no hay conexión no bloquea el ingreso.
+  static Future<void> refrescarConsentimiento() async {
+    if (_token == null) return;
+    try {
+      final r = await http
+          .get(Uri.parse('${ApiConfig.baseUrl}/usuarios/consentimiento'), headers: {'Authorization': 'Bearer $_token'})
+          .timeout(const Duration(seconds: 8));
+      if (r.statusCode == 200) _guardarConsentimiento(jsonDecode(r.body) as Map<String, dynamic>);
+    } catch (_) {}
+  }
+
+  /// Registra la aceptación de los términos (y la fecha de nacimiento / autorización del acudiente si hacen falta)
+  static Future<Map<String, dynamic>> aceptarTerminos({String? fechaNacimiento, bool autorizacionAcudiente = false}) async {
+    final r = await _post(
+      '/usuarios/aceptar-terminos',
+      {
+        'acepta_terminos': true,
+        'version_politica': LegalTexts.version,
+        'autorizacion_acudiente': autorizacionAcudiente,
+        if (fechaNacimiento != null) 'fecha_nacimiento': fechaNacimiento,
+      },
+      conSesion: true,
+      errorPorDefecto: 'No se pudo guardar tu aceptación',
+    );
+    if (r['exito'] == true) consentimientoPendiente = null;
+    return r;
   }
 
   /// Lee la fecha de expiración (exp) del JWT sin validar la firma: eso lo hace el servidor
@@ -83,6 +123,7 @@ class AuthService {
     required String password,
     required int rolId,
     required String nivelJuego,
+    bool autorizacionAcudiente = false, // solo menores de 18 años
   }) =>
       _post(
         '/auth/registro',
@@ -96,6 +137,9 @@ class AuthService {
           'password': password,
           'rol_id': rolId,
           'nivel_juego': nivelJuego,
+          'acepta_terminos': true,
+          'version_politica': LegalTexts.version,
+          'autorizacion_acudiente': autorizacionAcudiente,
 
         },
         ok: 201,
@@ -138,7 +182,9 @@ class AuthService {
     } catch (e) {
       // ApiException 10 = SHA-1 o nombre de paquete no coinciden; 12500 = falta configurar la pantalla de consentimiento
       debugPrint('Google Sign-In: $e');
-      return {'exito': false, 'mensaje': 'No se pudo conectar con Google. Revisa la configuración (SHA-1, nombre de paquete y client ID)'};
+      // Se muestra el detalle técnico para poder diagnosticar (ej. "sign_in_failed ... 10")
+      final detalle = e.toString().replaceAll(RegExp(r'\s+'), ' ');
+      return {'exito': false, 'mensaje': 'No se pudo conectar con Google. Revisa la configuración (SHA-1, nombre de paquete y client ID).\n\nDetalle: ${detalle.length > 160 ? detalle.substring(0, 160) : detalle}'};
     }
   }
 
@@ -151,6 +197,7 @@ class AuthService {
   static Future<Map<String, dynamic>> _abrirSesion(Map<String, dynamic> r) async {
     _token = r['token'] as String;
     _usuario = r['usuario'] as Map<String, dynamic>;
+    _guardarConsentimiento(r);
     await _storage.write(key: 'token', value: _token);
     await _storage.write(key: 'usuario', value: jsonEncode(_usuario));
     return r;
@@ -167,6 +214,7 @@ class AuthService {
   static Future<void> logout() async {
     _token = null;
     _usuario = null;
+    consentimientoPendiente = null;
     try {
       await _storage.delete(key: 'token');
       await _storage.delete(key: 'usuario');
