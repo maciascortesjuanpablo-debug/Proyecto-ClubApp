@@ -11,3 +11,9 @@ local.properties
 # IDE
 .idea/
 *.iml
+
+# Secretos (archivo sin punto)
+env
+
+# Cache de Kotlin
+.kotlin/

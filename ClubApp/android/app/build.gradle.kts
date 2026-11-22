@@ -13,7 +13,7 @@ val keystoreProps = Properties().apply {
 }
 
 android {
-    namespace = "com.clubapp.app"
+    namespace = "com.clubappgarzon.app"
     compileSdk = flutter.compileSdkVersion
     ndkVersion = flutter.ndkVersion
 
@@ -24,7 +24,7 @@ android {
 
     defaultConfig {
         // TODO: Specify your own unique Application ID (https://developer.android.com/studio/build/application-id.html).
-        applicationId = "com.clubapp.app"
+        applicationId = "com.clubappgarzon.app"
         // You can update the following values to match your application needs.
         // For more information, see: https://flutter.dev/to/review-gradle-config.
         minSdk = maxOf(flutter.minSdkVersion, 23) // flutter_secure_storage requiere API 23+
