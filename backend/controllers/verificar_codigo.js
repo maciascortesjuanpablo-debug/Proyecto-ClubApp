@@ -56,7 +56,7 @@ export const verificarCodigo = async (req, res) => {
       return res.status(429).json({ mensaje: 'Demasiados intentos, solicita un código nuevo' });
     }
 
-    const codigoValido = await codigoVerificacionModel.buscarValido({ usuario_id: usuario.id, codigo });
+    const codigoValido = await codigoVerificacionModel.buscarValido({ usuario_id: usuario.id, codigo, tipo: TIPO });
     if (!codigoValido) {
       intentos.fallo(usuario.id);
       return invalido();

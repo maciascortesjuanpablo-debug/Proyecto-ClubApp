@@ -53,6 +53,10 @@ export const anonimizarUsuario = async (id) => {
 
 // Anonimiza las cuentas cuyo plazo venció. Se puede ejecutar las veces que sea: no repite cuentas ya anonimizadas.
 export const purgarVencidos = async () => {
+  // Los códigos de verificación (2FA y recuperar contraseña) solo valen 10 minutos: se borran los de más de un día
+  await intentar('códigos vencidos', async () =>
+    datos(await supabase.from('codigos_verificacion').delete().lt('expira_en', new Date(Date.now() - 24 * 3600 * 1000).toISOString())));
+
   const vencidos = datos(await supabase.from('usuarios').select('id')
     .not('eliminacion_programada_en', 'is', null)
     .lte('eliminacion_programada_en', new Date().toISOString())

@@ -16,7 +16,7 @@ export const crearPerfil = async (req, res) => {
       return res.status(409).json({ mensaje: 'Este usuario ya tiene un perfil creado' });
     }
     const campos = limpiarCampos(req.body);
-    if (req.usuario.rol_id !== ROLES.JUGADOR && !campos.posicion) campos.posicion = NOMBRE_ROL[req.usuario.rol_id] ?? 'Usuario';
+    if (!campos.posicion) campos.posicion = req.usuario.rol_id === ROLES.JUGADOR ? 'Sin asignar' : (NOMBRE_ROL[req.usuario.rol_id] ?? 'Usuario');
     const perfil = await perfilJugadorModel.crear({ usuario_id, ...campos });
     res.status(201).json({ mensaje: 'Perfil creado', perfil });
   } catch (error) {

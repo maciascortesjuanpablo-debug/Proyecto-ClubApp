@@ -43,6 +43,9 @@ export const autenticarConGoogle = async (req, res) => {
 
       // Vincula Google si faltaba
       const cambios = {};
+      // Anti pre-secuestro: si la cuenta tenía contraseña pero nunca se comprobó que el correo fuera de quien la creó,
+      // esa contraseña pudo ponerla un tercero. Google demuestra quién es el dueño del correo: se borra la contraseña.
+      if (!usuario.googleId && !usuario.correo_verificado && usuario.password_hash) cambios.password_hash = null;
       if (!usuario.googleId) cambios.googleId = googleId;
       if (!usuario.avatar && avatar) cambios.avatar = avatar;
       if (!usuario.isVerified) cambios.isVerified = true;

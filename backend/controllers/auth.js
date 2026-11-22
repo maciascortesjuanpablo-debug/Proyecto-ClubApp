@@ -148,6 +148,9 @@ export const verificarDosPasos = async (req, res) => {
     const usuario = await usuarioModel.buscarPorId(id);
     if (!usuario || usuario.activo === false) return res.status(403).json({ mensaje: 'Esta cuenta está inactiva' });
 
+    // Haber recibido el código en el correo prueba que la persona es su dueña
+    if (!usuario.correo_verificado) await usuarioModel.actualizarUsuario(usuario.id, { correo_verificado: true });
+
     res.json({ ...respuestaSesion(usuario), ...(await estadoConsentimiento(usuario.id)) });
   } catch (error) {
     fallo(res, error, 'Error al verificar el código');

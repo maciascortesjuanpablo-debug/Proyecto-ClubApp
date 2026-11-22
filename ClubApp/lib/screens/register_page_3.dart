@@ -12,6 +12,7 @@ import '../components/form_section.dart';
 import '../components/progress_bar.dart';
 import '../components/success_dialog.dart';
 import '../services/auth_service.dart';
+import '../services/profile_service.dart';
 import 'two_factor_page.dart';
 
 class RegisterPage3 extends StatefulWidget {
@@ -24,6 +25,7 @@ class RegisterPage3 extends StatefulWidget {
   final String posicion;
   final int rolId;
   final String nivelJuego;
+  final String? fotoPath; // foto de perfil elegida en el paso 2 (opcional)
 
   const RegisterPage3({
     super.key,
@@ -36,6 +38,7 @@ class RegisterPage3 extends StatefulWidget {
     required this.posicion,
     required this.rolId,
     required this.nivelJuego,
+    this.fotoPath,
   });
 
   @override
@@ -168,6 +171,7 @@ class _RegisterPage3State extends State<RegisterPage3> {
             titulo: '¡Cuenta Creada!',
             mensaje: mensaje,
             posicionPerfil: widget.posicion,
+            fotoPerfil: widget.fotoPath,
             desdeRegistro: true,
           ),
         ),
@@ -176,7 +180,7 @@ class _RegisterPage3State extends State<RegisterPage3> {
       return;
     }
 
-    if (widget.posicion.isNotEmpty) await AuthService.crearPerfilJugador(posicion: widget.posicion);
+    await ProfileService.crearPerfilInicial(posicion: widget.posicion, fotoPath: widget.fotoPath);
     if (!mounted) return;
     await SuccessDialog.show(
       context: context,
